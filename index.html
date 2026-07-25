@@ -424,6 +424,10 @@ hr.hair{ border:none; border-top:1px solid var(--line-soft); margin: 18px 0; }
   color: var(--ink-faint);
 }
 .kiosk-home-btn svg{ width:17px; height:17px; }
+.signin-hero{ position:relative; width:100%; height:34vh; min-height:200px; max-height:320px; overflow:hidden; flex:none; }
+.signin-hero img{ width:100%; height:100%; object-fit:cover; display:block; }
+.signin-hero-fade{ position:absolute; inset:0; background:linear-gradient(to bottom, rgba(0,0,0,0) 40%, var(--paper) 97%); }
+.signin-screen.has-hero .signin-brandline{ margin-top:-52px; position:relative; z-index:2; }
 .signin-confirm-wrap{
   flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center; padding:40px;
@@ -1284,6 +1288,7 @@ function newOpenHouse(data){
     date: data.date || todayISO(),
     startTime: data.startTime || "13:00",
     endTime: data.endTime || "15:00",
+    photoDataUrl: data.photoDataUrl || "",
     status: "active",
     createdAt: Date.now()
   };
@@ -1870,16 +1875,52 @@ function sheetCreateOpenHouse(){
   });
 }
 
+function propertyPhotoFieldHtml(oh){
+  return '<div class="field" style="margin-bottom:22px;"><label>Sign-In Photo</label>' +
+    '<div class="logo-preview-wrap">' +
+      (oh.photoDataUrl
+        ? '<img class="logo-preview" style="width:72px;height:56px;border-radius:12px;" src="'+esc(oh.photoDataUrl)+'" alt="">'
+        : '<div class="logo-placeholder" style="width:72px;height:56px;border-radius:12px;">'+ICONS.home+'</div>') +
+      '<div class="file-btn-wrap"><button type="button" class="btn btn-secondary btn-sm">Upload</button><input type="file" id="f-photo-file" accept="image/*"></div>' +
+      (oh.photoDataUrl ? '<button type="button" class="btn btn-ghost btn-sm" id="f-photo-remove">Remove</button>' : '') +
+    '</div>' +
+    '<div class="settings-help">Shown at the top of the Visitor Sign-In screen, fading gently into the page below.</div>' +
+  '</div>';
+}
 function sheetEditProperty(oh){
   var body =
     '<div class="sheet-head"><h3>'+esc(cfg("pages.propertyForm.editTitle"))+'</h3><button class="sheet-close" data-sheet-close>'+ICONS.close+'</button></div>' +
-    '<div class="sheet-body">' + propertyFormFieldsHtml("f", oh) + '</div>' +
+    '<div class="sheet-body">' + propertyPhotoFieldHtml(oh) + propertyFormFieldsHtml("f", oh) + '</div>' +
     '<div class="sheet-footer"><button class="btn btn-primary" id="btn-save-oh">'+esc(cfg("pages.propertyForm.saveButton"))+'</button></div>';
 
   openSheet(body, function(sheet, close){
     sheet.querySelector("[data-sheet-close]").addEventListener("click", close);
     bindCurrencyInput(sheet.querySelector("#f-price"), oh.price);
     attachAddressAutocomplete(sheet, "f");
+    var photoFileInput = sheet.querySelector("#f-photo-file");
+    if(photoFileInput){
+      photoFileInput.addEventListener("change", function(){
+        var file = photoFileInput.files && photoFileInput.files[0];
+        if(!file) return;
+        var reader = new FileReader();
+        reader.onload = function(){
+          oh.photoDataUrl = String(reader.result||"");
+          saveState(); flashAutosave(); close();
+          appEl.removeEventListener("click", globalClickHandler);
+          render();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    var photoRemoveBtn = sheet.querySelector("#f-photo-remove");
+    if(photoRemoveBtn){
+      photoRemoveBtn.addEventListener("click", function(){
+        oh.photoDataUrl = "";
+        saveState(); flashAutosave(); close();
+        appEl.removeEventListener("click", globalClickHandler);
+        render();
+      });
+    }
     sheet.querySelector("#btn-save-oh").addEventListener("click", function(){
       oh.address = sheet.querySelector("#f-address").value.trim();
       oh.city = sheet.querySelector("#f-city").value.trim();
@@ -2088,8 +2129,12 @@ function screenSignIn(){
       '</div>'
   };
 
-  return '<div class="screen signin-screen">' +
-    '<div style="padding-top:36px;">'+brandline+'</div>' +
+  var hasPhoto = !!oh.photoDataUrl;
+  var heroHtml = hasPhoto ? '<div class="signin-hero"><img src="'+esc(oh.photoDataUrl)+'" alt=""><div class="signin-hero-fade"></div></div>' : '';
+
+  return '<div class="screen signin-screen'+(hasPhoto?' has-hero':'')+'">' +
+    heroHtml +
+    '<div style="padding-top:'+(hasPhoto?'0':'36px')+';">'+brandline+'</div>' +
     '<div class="content">' +
       '<div class="signin-intro">' +
         '<h1>'+esc(propertyOneLine(oh))+'</h1>' +
