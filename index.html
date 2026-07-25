@@ -1129,26 +1129,32 @@ function applyBrandStyles(){
 var state = loadState();
 
 /* ---- migrate a single visitor.detail object to the current (v3) shape ---- */
+/* Firebase Realtime Database silently deletes empty arrays/objects on write — a visitor
+   with, say, no motivations selected and no tasks yet (the common case for someone who
+   just signed in) comes back from a sync pull with those keys missing entirely, not as
+   [] or {}. arr()/obj() below re-normalize a value that SHOULD be an array/object but may
+   have been stripped down to undefined, so every field below is guaranteed present and
+   correctly-typed regardless of what Firebase did to it on the way through. */
+function arr(v){ return Array.isArray(v) ? v : []; }
+function obj(v){ return (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; }
 function migrateVisitorDetail(old){
   old = old || {};
-  var isV3 = old.mustHaves && typeof old.mustHaves === "object" && old.niceToHaves && typeof old.niceToHaves === "object" && old.motivation && Array.isArray(old.motivation.selected);
+  /* Detect V3 shape by object-typed containers only — NOT by whether their .selected
+     array happens to be present, since an empty (and therefore Firebase-stripped) array
+     is completely normal V3 data, not a sign this is an older shape. */
+  var isV3 = old.mustHaves && typeof old.mustHaves === "object" && old.niceToHaves && typeof old.niceToHaves === "object" && old.motivation && typeof old.motivation === "object";
   if(isV3){
-    old.mustHaves.selected = old.mustHaves.selected || [];
-    old.mustHaves.note = old.mustHaves.note || "";
-    old.niceToHaves.selected = old.niceToHaves.selected || [];
-    old.niceToHaves.note = old.niceToHaves.note || "";
-    old.motivation.note = old.motivation.note || "";
-    old.financing = old.financing || { type:"", preApproval:"", lenderNotes:"" };
-    old.financing.lenderNotes = old.financing.lenderNotes || "";
-    old.family = old.family || { householdSize:"", children:"Not Discussed", note:"" };
-    old.family.children = old.family.children || "Not Discussed";
-    old.pets = old.pets || { selected:[], note:"" };
-    old.dealBreakers = old.dealBreakers || { selected:[], note:"" };
-    old.followUp = old.followUp || { promise:"", nextAction:"", date:"", assignedTo:"", status:"Not Started" };
-    old.followUp.status = old.followUp.status || "Not Started";
-    old.preferredAreas = old.preferredAreas || [];
+    old.mustHaves = obj(old.mustHaves); old.mustHaves.selected = arr(old.mustHaves.selected); old.mustHaves.note = old.mustHaves.note || "";
+    old.niceToHaves = obj(old.niceToHaves); old.niceToHaves.selected = arr(old.niceToHaves.selected); old.niceToHaves.note = old.niceToHaves.note || "";
+    old.motivation = obj(old.motivation); old.motivation.selected = arr(old.motivation.selected); old.motivation.note = old.motivation.note || "";
+    old.financing = obj(old.financing); old.financing.type = old.financing.type || ""; old.financing.preApproval = old.financing.preApproval || ""; old.financing.lenderNotes = old.financing.lenderNotes || "";
+    old.family = obj(old.family); old.family.householdSize = old.family.householdSize || ""; old.family.children = old.family.children || "Not Discussed"; old.family.note = old.family.note || "";
+    old.pets = obj(old.pets); old.pets.selected = arr(old.pets.selected); old.pets.note = old.pets.note || "";
+    old.dealBreakers = obj(old.dealBreakers); old.dealBreakers.selected = arr(old.dealBreakers.selected); old.dealBreakers.note = old.dealBreakers.note || "";
+    old.followUp = obj(old.followUp); old.followUp.promise = old.followUp.promise || ""; old.followUp.nextAction = old.followUp.nextAction || ""; old.followUp.date = old.followUp.date || ""; old.followUp.assignedTo = old.followUp.assignedTo || ""; old.followUp.status = old.followUp.status || "Not Started";
+    old.preferredAreas = arr(old.preferredAreas);
     old.connectionSummary = old.connectionSummary || "";
-    old.tasks = (old.tasks||[]).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; });
+    old.tasks = arr(old.tasks).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; });
     old.notesComplete = !!old.notesComplete;
     return old;
   }
@@ -1223,9 +1229,9 @@ function migrateVisitorDetail(old){
     pets: pets,
     dealBreakers: dealBreakers,
     followUp: followUp,
-    preferredAreas: old.preferredAreas || [],
+    preferredAreas: arr(old.preferredAreas),
     connectionSummary: connectionSummary,
-    tasks: (old.tasks||[]).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; }),
+    tasks: arr(old.tasks).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; }),
     notesComplete: !!old.notesComplete
   };
 }
