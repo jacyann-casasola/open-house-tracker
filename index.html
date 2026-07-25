@@ -2893,7 +2893,15 @@ var Sync = {
     var localUpdatedAt = state._lastSyncedAt || 0;
     if(!remote.updatedAt || remote.updatedAt <= localUpdatedAt) return;
     state.openHouses = remote.openHouses || [];
-    state.visitors = remote.visitors || [];
+    /* Firebase Realtime Database silently drops empty arrays/objects on write — a visitor
+       with no tasks, no selected motivations, etc. comes back missing those keys entirely
+       rather than as []. Route every incoming visitor's detail back through the same
+       normalizer migrateState() uses for locally-loaded data, so the rest of the app can
+       keep assuming these fields always exist. */
+    state.visitors = (remote.visitors || []).map(function(v){
+      v.detail = migrateVisitorDetail(v.detail);
+      return v;
+    });
     state.activeOpenHouseId = remote.activeOpenHouseId || null;
     state.content = deepMergeDefaults(remote.content || {}, CONTENT_DEFAULTS);
     syncOptionListsFromContent();
