@@ -1373,6 +1373,26 @@ function formatTime(t){
   return h12 + ":" + m + " " + ap;
 }
 function timeRange(oh){ return formatTime(oh.startTime) + " – " + formatTime(oh.endTime); }
+function formatSignInTime(ts){
+  if(!ts) return "";
+  var d = new Date(ts);
+  var h = d.getHours(), m = pad(d.getMinutes());
+  if(cfg("formats.timeFormat")==="24h") return pad(h)+":"+m;
+  var ap = h>=12 ? "PM" : "AM"; var h12 = h%12; if(h12===0) h12=12;
+  return h12 + ":" + m + " " + ap;
+}
+/* A phone number is only a problem when it's partially entered — 1 to 9 digits.
+   Blank is fine (nobody's required to give a phone unless the field says so
+   elsewhere), and 10 digits is a complete number. This only catches the case a
+   visitor got interrupted mid-digit and the form let it through anyway. */
+function phoneIncomplete(phone){
+  if(!phone) return false;
+  var digits = String(phone).replace(/[^0-9]/g,"");
+  return digits.length > 0 && digits.length < 10;
+}
+function chronologicalQueue(list){
+  return list.slice().sort(function(a,b){ return b.createdAt - a.createdAt; });
+}
 function propertyTitle(oh){ return oh.address || "Untitled Property"; }
 function propertyCityLine(oh){
   var bits = [];
@@ -2189,6 +2209,7 @@ function mountSignIn(){
       var email = emailEl ? emailEl.value.trim() : "";
       if(fieldCfg("signin","name").required!==false && nameEl && !name){ nameEl.focus(); return; }
       if(fieldCfg("signin","phone").required && phoneEl && !phone){ phoneEl.focus(); return; }
+      if(phoneIncomplete(phone)){ if(phoneEl) phoneEl.focus(); toast("Enter a complete 10-digit phone number, or leave it blank"); return; }
       var otherEl = document.querySelector("#s-purpose-other");
       var v = newVisitor(oh.id, {
         name: name, phone: phone, email: email,
@@ -2197,6 +2218,12 @@ function mountSignIn(){
         visitPurposeOther: otherEl ? otherEl.value.trim() : "",
         source: "selfSignIn"
       }, true);
+      /* Every self-serve sign-in gets these two follow-up tasks automatically,
+         so nothing depends on an agent remembering to add them by hand. */
+      v.detail.tasks = v.detail.tasks.concat([
+        { id:uid(), text:"Send video message", done:false, dueDate:"", assignedTo:"" },
+        { id:uid(), text:"Add to FUB", done:false, dueDate:"", assignedTo:"" }
+      ]);
       state.visitors.push(v);
       saveState();
       nav("signin", { phase:"confirm" });
@@ -2262,13 +2289,21 @@ function visitorCardHtml(v){
   var badge = status==="follow-up" ? '<span class="badge badge-followup">Follow-Up</span>' :
               status==="capture" ? '<span class="badge badge-capture">Needs Notes</span>' :
               '<span class="badge badge-complete">Complete</span>';
-  var sub = [];
-  if(v.reasonForVisit) sub.push(v.reasonForVisit);
+  /* Surface what was actually captured at sign-in — visit purpose ("Reason for
+     Visit"), representation status ("Working With An Agent?"), and contact info
+     ("Your Information") as a fallback — instead of "No details yet" for visitors
+     who haven't had a full detail-page pass yet. The timestamp always renders, so
+     the subtitle is never empty. */
+  var sub = [formatSignInTime(v.createdAt)];
+  var purpose = visitPurposeLabel(v.visitPurpose) || v.visitPurposeOther || v.reasonForVisit;
+  if(purpose) sub.push(purpose);
   if(v.buyingTimeline && v.buyingTimeline!=="unknown") sub.push(timelineLabel(v.buyingTimeline));
+  if(v.representationStatus && v.representationStatus!=="not-discussed") sub.push(repLabel(v.representationStatus));
+  if(sub.length<2){ if(v.phone) sub.push(v.phone); else if(v.email) sub.push(v.email); }
   return '<div class="visitor-card" data-nav="visitorDetail" data-id="'+v.id+'">' +
     '<div class="v-avatar">'+esc(initials(v.name))+'</div>' +
     '<div class="v-main"><div class="v-name">'+esc(v.name||"Unnamed Visitor")+'</div>' +
-    '<div class="v-sub">'+esc(sub.join(" · ")||"No details yet")+'</div></div>' +
+    '<div class="v-sub">'+esc(sub.join(" · "))+'</div></div>' +
     '<div class="v-badges">'+badge+'<div class="chev">'+ICONS.chev+'</div></div>' +
     '</div>';
 }
@@ -2349,6 +2384,7 @@ function sheetQuickCapture(){
       var data = gather();
       var nameEl = sheet.querySelector("#q-name");
       if(fieldCfg("quickCapture","name").required!==false && nameEl && !data.name){ nameEl.focus(); return; }
+      if(phoneIncomplete(data.phone)){ if(qPhoneEl) qPhoneEl.focus(); toast("Enter a complete 10-digit phone number, or leave it blank"); return; }
       var v = newVisitor(oh.id, data, capturedLater);
       state.visitors.push(v);
       saveState();
@@ -2369,7 +2405,9 @@ function screenQueue(){
   if(!oh) return screenWelcome();
   var filter = route.params.filter || "all";
   var all = visitorsFor(oh.id);
-  var list = sortedQueue(all);
+  /* The Queue is the sign-in log — most recent first — not the priority-ranked
+     view. (Workspace's "who needs attention" preview keeps using sortedQueue.) */
+  var list = chronologicalQueue(all);
   if(filter !== "all") list = list.filter(function(v){ return visitorStatus(v)===filter; });
 
   var qc = cfg("pages.queue");
