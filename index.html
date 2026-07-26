@@ -200,10 +200,10 @@ input,textarea,select{ font-family: inherit; }
 }
 .v-main{ flex:1; min-width:0; }
 .v-name{ font-size:16.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.v-name-row{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
 .v-time{ font-size:12px; font-weight:600; color: var(--ink-faint); flex:none; white-space:nowrap; }
-.v-sub{ font-size:13px; color: var(--ink-soft); margin-top:3px; line-height:1.45; }
-.v-badges{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex:none; }
+.v-sub{ font-size:13px; color: var(--ink-soft); margin-top:3px; line-height:1.4; }
+.v-badges{ display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex:none; }
+.v-status-row{ display:flex; align-items:center; gap:6px; }
 .badge{
   font-size:11px; font-weight:700; padding:5px 10px; border-radius: var(--r-pill);
   letter-spacing:.02em; white-space:nowrap;
@@ -1350,7 +1350,13 @@ function newVisitor(openHouseId, data, capturedLater){
       followUp: { promise:"", nextAction:"", date:"", assignedTo:"", status:"Not Started" },
       preferredAreas: [],
       connectionSummary: "",
-      tasks: [],
+      /* Every new visitor record — sign-in kiosk or agent quick capture — gets these
+         two follow-up tasks automatically, so nothing depends on an agent remembering
+         to add them by hand. */
+      tasks: [
+        { id:uid(), text:"Send video message", done:false, dueDate:"", assignedTo:"" },
+        { id:uid(), text:"Add to FUB", done:false, dueDate:"", assignedTo:"" }
+      ],
       notesComplete: false
     }
   };
@@ -2262,12 +2268,6 @@ function mountSignIn(){
         visitPurposeOther: otherEl ? otherEl.value.trim() : "",
         source: "selfSignIn"
       }, true);
-      /* Every self-serve sign-in gets these two follow-up tasks automatically,
-         so nothing depends on an agent remembering to add them by hand. */
-      v.detail.tasks = v.detail.tasks.concat([
-        { id:uid(), text:"Send video message", done:false, dueDate:"", assignedTo:"" },
-        { id:uid(), text:"Add to FUB", done:false, dueDate:"", assignedTo:"" }
-      ]);
       state.visitors.push(v);
       saveState();
       nav("signin", { phase:"confirm" });
@@ -2333,23 +2333,23 @@ function visitorCardHtml(v){
   var badge = status==="follow-up" ? '<span class="badge badge-followup">Follow-Up</span>' :
               status==="capture" ? '<span class="badge badge-capture">Needs Notes</span>' :
               '<span class="badge badge-complete">Complete</span>';
-  /* Card cover always mirrors exactly what was captured on the sign-in page — phone,
-     email (if given), reason for visit, and agent status — every time, not just when a
-     field happens to be filled in. The sign-in timestamp is kept visually separate (its
-     own line, next to the name) instead of blended into the personal-info line below. */
-  var details = [];
-  if(v.phone) details.push(v.phone);
-  if(v.email) details.push(v.email);
+  /* Card cover always mirrors what was captured on the sign-in page. Left, left-aligned:
+     name / phone | email / reason for visit · agent status. Right, right-aligned:
+     sign-in timestamp above the status badge + chevron. */
+  var contactLine = [v.phone, v.email].filter(Boolean).join(" | ") || cfg("pages.snapshotDetail.noContactInfo");
   var purpose = visitPurposeLabel(v.visitPurpose) || v.visitPurposeOther || v.reasonForVisit;
-  if(purpose) details.push(purpose);
-  details.push(repLabel(v.representationStatus) || "Agent Not Discussed");
+  var reasonAgentLine = [purpose, repLabel(v.representationStatus) || "Agent Not Discussed"].filter(Boolean).join(" · ");
   return '<div class="visitor-card" data-nav="visitorDetail" data-id="'+v.id+'">' +
     '<div class="v-avatar">'+esc(initials(v.name))+'</div>' +
     '<div class="v-main">' +
-      '<div class="v-name-row"><div class="v-name">'+esc(v.name||"Unnamed Visitor")+'</div><div class="v-time">'+esc(formatSignInTime(v.createdAt))+'</div></div>' +
-      '<div class="v-sub">'+esc(details.join(" · "))+'</div>' +
+      '<div class="v-name">'+esc(v.name||"Unnamed Visitor")+'</div>' +
+      '<div class="v-sub">'+esc(contactLine)+'</div>' +
+      '<div class="v-sub">'+esc(reasonAgentLine)+'</div>' +
     '</div>' +
-    '<div class="v-badges">'+badge+'<div class="chev">'+ICONS.chev+'</div></div>' +
+    '<div class="v-badges">' +
+      '<div class="v-time">'+esc(formatSignInTime(v.createdAt))+'</div>' +
+      '<div class="v-status-row">'+badge+'<div class="chev">'+ICONS.chev+'</div></div>' +
+    '</div>' +
     '</div>';
 }
 
@@ -2510,7 +2510,8 @@ var MULTI_SELECT_CONFIG = {
   motivation:    { title:"Motivation",      path:"motivation.selected",    flat: MOTIVATION_OPTIONS,       placeholder:"Select motivation(s)…" },
   dealBreakers:  { title:"Deal Breakers",    path:"dealBreakers.selected",  flat: DEALBREAKER_OPTIONS,      placeholder:"Select deal breaker(s)…" },
   mustHaves:     { title:"Must-Haves",       path:"mustHaves.selected",     grouped: PREFERENCE_CATEGORIES, otherKey:"niceToHaves", placeholder:"Select must-have(s)…" },
-  niceToHaves:   { title:"Nice-to-Haves",    path:"niceToHaves.selected",   grouped: PREFERENCE_CATEGORIES, otherKey:"mustHaves",   placeholder:"Select nice-to-have(s)…" }
+  niceToHaves:   { title:"Nice-to-Haves",    path:"niceToHaves.selected",   grouped: PREFERENCE_CATEGORIES, otherKey:"mustHaves",   placeholder:"Select nice-to-have(s)…" },
+  pets:          { title:"Pets",             path:"pets.selected",          flat: PET_OPTIONS,               exclusive: PET_EXCLUSIVE, placeholder:"Select pet detail(s)…" }
 };
 function multiSelectFieldHtml(key, selectedArr){
   selectedArr = selectedArr || [];
@@ -2562,7 +2563,13 @@ function sheetMultiSelectPicker(v, key){
       var idx = selected.indexOf(val);
       if(idx>-1){ selected.splice(idx,1); }
       else{
-        selected.push(val);
+        if(entry.exclusive && entry.exclusive.indexOf(val)>-1){
+          /* Picking an exclusive value (e.g. "No Pets") clears everything else. */
+          selected = [val];
+        } else {
+          if(entry.exclusive){ selected = selected.filter(function(x){ return entry.exclusive.indexOf(x)===-1; }); }
+          selected.push(val);
+        }
         if(otherArr){ var oIdx = otherArr.indexOf(val); if(oIdx>-1) otherArr.splice(oIdx,1); }
       }
       bodyEl.innerHTML = rowsHtml();
@@ -2687,7 +2694,7 @@ function screenVisitorDetail(){
 
     pets: '<div class="section-head"><h3>'+esc(vdc.sectionPets)+'</h3></div>' +
       '<div class="card">' +
-        '<div class="chip-group" data-exclusive="'+PET_EXCLUSIVE.join("|")+'">' + multiChipGroupHtml(PET_OPTIONS, "pets.selected", d.pets.selected) + '</div>' +
+        multiSelectFieldHtml("pets", d.pets.selected) +
         optionalDetailHtml("pets.note", d.pets.note, cfg("signin.otherPlaceholder"), "Other Pet Detail(s)") +
       '</div>',
 
@@ -2704,7 +2711,10 @@ function screenVisitorDetail(){
           NEXT_ACTIONS.map(function(a){ return '<option value="'+esc(a)+'"'+(d.followUp.nextAction===a?" selected":"")+'>'+esc(a)+'</option>'; }).join("") +
         '</select></div>' : '') +
         (fdF.visible!==false ? '<div class="field"><label>Follow-Up Date'+(fdF.required?' <span class="req-mark">*</span>':'')+'</label><input type="date" data-field="followUp.date" value="'+esc(d.followUp.date)+'"></div>' : '') +
-        (atF.visible!==false ? '<div class="field"><label>Assigned To'+(atF.required?' <span class="req-mark">*</span>':'')+'</label><div class="chip-group">'+chipGroupHtml(ASSIGNEES, "followUp.assignedTo", d.followUp.assignedTo)+'</div></div>' : '') +
+        (atF.visible!==false ? '<div class="field"><label>Assigned To'+(atF.required?' <span class="req-mark">*</span>':'')+'</label><select data-field="followUp.assignedTo">' +
+          '<option value="">Select…</option>' +
+          ASSIGNEES.map(function(a){ return '<option value="'+esc(a)+'"'+(d.followUp.assignedTo===a?" selected":"")+'>'+esc(a)+'</option>'; }).join("") +
+        '</select></div>' : '') +
         (fsF.visible!==false ? '<div class="field" style="margin-bottom:0;"><label>Follow-Up Status'+(fsF.required?' <span class="req-mark">*</span>':'')+'</label><div class="toggle-row">'+chipGroupHtml(FOLLOWUP_STATUSES, "followUp.status", d.followUp.status)+'</div></div>' : '') +
         '<div id="followup-done-wrap" style="margin-top:14px;" class="'+(showFollowUpDone?"":"hidden")+'"><button class="btn-followup-done'+(d.followUp.status==="Completed"?" done":"")+'" data-action="toggleFollowUp">'+ICONS.check+'<span>'+(d.followUp.status==="Completed"?esc(vdc.markFollowUpUndoButton):esc(vdc.markFollowUpDoneButton))+'</span></button></div>' +
       '</div>',
