@@ -639,6 +639,7 @@ var CONTENT_DEFAULTS = {
     sectionReason: "Reason for Visit",
     namePlaceholder: "First and Last Name(s)",
     phonePlaceholder: "(555) 012-3456",
+    emailPlaceholder: "you@example.com",
     otherPlaceholder: "Other",
     submitButton: "Submit Sign-In",
     confirmHeading: "You're all set.",
@@ -647,6 +648,7 @@ var CONTENT_DEFAULTS = {
   quickCapture: {
     title: "Quick Visitor Capture",
     namePlaceholder: "First and Last Name(s)",
+    emailPlaceholder: "you@example.com",
     reasonLabel: "Reason for Visit",
     storyNoteLabel: "Story Note",
     storyNotePlaceholder: "One detail that will help you remember them.",
@@ -2184,7 +2186,7 @@ function screenSignIn(){
       (nameF.visible!==false ? '<div class="field"><label>Name(s)'+(nameF.required?' <span class="req-mark">*</span>':'')+'</label><input type="text" id="s-name" placeholder="'+esc(cfg("signin.namePlaceholder"))+'" autocomplete="off"></div>' : '') +
       '<div class="field-row">' +
         (phoneF.visible!==false ? '<div class="field"><label>Phone'+(phoneF.required?' <span class="req-mark">*</span>':'')+'</label><input type="tel" id="s-phone" placeholder="'+esc(cfg("signin.phonePlaceholder"))+'" inputmode="tel"></div>' : '') +
-        (emailF.visible!==false ? '<div class="field" style="margin-bottom:0;"><label>Email'+(emailF.required?' <span class="req-mark">*</span>':'')+'</label><input type="email" id="s-email" placeholder="Optional"></div>' : '') +
+        (emailF.visible!==false ? '<div class="field" style="margin-bottom:0;"><label>Email'+(emailF.required?' <span class="req-mark">*</span>':'')+'</label><input type="email" id="s-email" placeholder="'+esc(cfg("signin.emailPlaceholder"))+'"></div>' : '') +
       '</div>' +
     '</div>';
 
@@ -2259,6 +2261,7 @@ function mountSignIn(){
       if(fieldCfg("signin","name").required!==false && nameEl && !name){ nameEl.focus(); return; }
       if(fieldCfg("signin","phone").required && phoneEl && !phone){ phoneEl.focus(); return; }
       if(phoneIncomplete(phone)){ if(phoneEl) phoneEl.focus(); toast("Enter a complete 10-digit phone number, or leave it blank"); return; }
+      if(fieldCfg("signin","email").required && emailEl && !email){ emailEl.focus(); toast("Email is required"); return; }
       if(email && !EMAIL_RE.test(email)){ if(emailEl) emailEl.focus(); toast("Enter a valid email address, or leave it blank"); return; }
       var otherEl = document.querySelector("#s-purpose-other");
       var v = newVisitor(oh.id, {
@@ -2369,7 +2372,7 @@ function sheetQuickCapture(){
       (qNameF.visible!==false ? '<div class="field"><label>Name(s)'+(qNameF.required?' <span class="req-mark">*</span>':'')+'</label><input type="text" id="q-name" placeholder="'+esc(cfg("quickCapture.namePlaceholder"))+'" autocomplete="off" autofocus></div>' : '') +
       '<div class="field-row">' +
         (qPhoneF.visible!==false ? '<div class="field"><label>Phone'+(qPhoneF.required?' <span class="req-mark">*</span>':'')+'</label><input type="tel" id="q-phone" placeholder="(555) 012-3456" inputmode="tel"></div>' : '') +
-        (qEmailF.visible!==false ? '<div class="field"><label>Email'+(qEmailF.required?' <span class="req-mark">*</span>':'')+'</label><input type="email" id="q-email" placeholder="Optional"></div>' : '') +
+        (qEmailF.visible!==false ? '<div class="field"><label>Email'+(qEmailF.required?' <span class="req-mark">*</span>':'')+'</label><input type="email" id="q-email" placeholder="'+esc(cfg("quickCapture.emailPlaceholder"))+'"></div>' : '') +
       '</div>',
     reason: '<div class="field"><label>'+esc(cfg("quickCapture.reasonLabel"))+'</label><div class="chip-group" id="q-reason">' +
         VISIT_REASONS.map(function(s){ return '<button type="button" class="chip" data-val="'+esc(s)+'">'+esc(s)+'</button>'; }).join("") +
@@ -2430,7 +2433,9 @@ function sheetQuickCapture(){
       var nameEl = sheet.querySelector("#q-name");
       if(fieldCfg("quickCapture","name").required!==false && nameEl && !data.name){ nameEl.focus(); return; }
       if(phoneIncomplete(data.phone)){ if(qPhoneEl) qPhoneEl.focus(); toast("Enter a complete 10-digit phone number, or leave it blank"); return; }
-      if(data.email && !EMAIL_RE.test(data.email)){ var qEmailEl = sheet.querySelector("#q-email"); if(qEmailEl) qEmailEl.focus(); toast("Enter a valid email address, or leave it blank"); return; }
+      var qEmailEl = sheet.querySelector("#q-email");
+      if(fieldCfg("quickCapture","email").required && qEmailEl && !data.email){ qEmailEl.focus(); toast("Email is required"); return; }
+      if(data.email && !EMAIL_RE.test(data.email)){ if(qEmailEl) qEmailEl.focus(); toast("Enter a valid email address, or leave it blank"); return; }
       var v = newVisitor(oh.id, data, capturedLater);
       state.visitors.push(v);
       saveState();
@@ -3123,12 +3128,14 @@ var CONTENT_FIELD_REGISTRY = [
   {group:"Visitor Sign-In", path:"signin.sectionReason", label:'"Reason for Visit" Section Title'},
   {group:"Visitor Sign-In", path:"signin.namePlaceholder", label:"Name Field Placeholder"},
   {group:"Visitor Sign-In", path:"signin.phonePlaceholder", label:"Phone Field Placeholder"},
+  {group:"Visitor Sign-In", path:"signin.emailPlaceholder", label:"Email Field Placeholder"},
   {group:"Visitor Sign-In", path:"signin.otherPlaceholder", label:'"Other" Field Placeholder'},
   {group:"Visitor Sign-In", path:"signin.submitButton", label:"Submit Button Label"},
   {group:"Confirmation Screens", path:"signin.confirmHeading", label:"Sign-In Confirmation Heading"},
   {group:"Confirmation Screens", path:"signin.confirmMessage", label:"Sign-In Confirmation Message (use {property})", multiline:true},
   {group:"Quick Add Visitor", path:"quickCapture.title", label:"Sheet Title"},
   {group:"Quick Add Visitor", path:"quickCapture.namePlaceholder", label:"Name Field Placeholder"},
+  {group:"Quick Add Visitor", path:"quickCapture.emailPlaceholder", label:"Email Field Placeholder"},
   {group:"Quick Add Visitor", path:"quickCapture.reasonLabel", label:"Reason Field Label"},
   {group:"Quick Add Visitor", path:"quickCapture.storyNoteLabel", label:"Story Note Label"},
   {group:"Quick Add Visitor", path:"quickCapture.storyNotePlaceholder", label:"Story Note Placeholder"},
