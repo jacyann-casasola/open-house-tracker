@@ -1451,10 +1451,16 @@ function formatPhoneDisplay(raw){
   return String(raw);
 }
 
-function migrateState(){
-  if(!state.settings) state.settings = { adminPasscode: "" };
-  if(!state.sync) state.sync = defaultSyncConfig();
-  state.content = deepMergeDefaults(state.content, CONTENT_DEFAULTS);
+/* ---- Shared migration steps, used both at local boot (migrateState) AND every time
+   remote data arrives via Firebase Sync (Sync.applyRemote). This split exists because of
+   a regression: applyRemote used to rebuild state.content with deepMergeDefaults alone,
+   skipping every one-time shape migration below — so a stale remote snapshot (pushed by
+   any device that hadn't loaded the current version yet) would silently overwrite an
+   already-upgraded local shape, e.g. resetting the Visitor Profile's section list back to
+   its pre-Command-Center ids and making "This Home"/"Their Home Search" disappear even
+   though the code rendering them was correct. Every place state.content gets rebuilt from
+   a serialized source must run through migrateContentShape() so this can't happen again. */
+function migrateContentShape(){
   migrateKeyedListShape("contactTypes", "contactTypeLabels", CONTACT_TYPE_KEYS);
   migrateKeyedListShape("visitPurposes", "visitPurposeLabels", VISIT_PURPOSE_KEYS);
   migrateKeyedListShape("timelines", "timelineLabels", TIMELINE_KEYS);
@@ -1465,25 +1471,36 @@ function migrateState(){
   mergeNewSimpleOptionItems("preApprovalStatuses", PREAPPROVAL_STATUSES);
   migrateVisitorDetailSectionsV2();
   mergeNewFieldConfigs("visitorDetailSimple");
-  state.visitors.forEach(function(v){
-    if(v.storyAnchor !== undefined){ if(v.reasonForVisit===undefined) v.reasonForVisit = v.storyAnchor; delete v.storyAnchor; }
-    if(v.reasonForVisit===undefined) v.reasonForVisit = "";
-    if(v.representationStatus === "has-agent") v.representationStatus = "represented";
-    if(v.representationStatus === "unsure") v.representationStatus = "not-discussed";
-    if(!v.representationStatus) v.representationStatus = "not-discussed";
-    if(!v.buyingTimeline) v.buyingTimeline = "unknown";
-    if(v.storyNote===undefined) v.storyNote = "";
-    if(v.visitPurpose===undefined) v.visitPurpose = "";
-    if(v.visitPurposeOther===undefined) v.visitPurposeOther = "";
-    if(!v.contactType) v.contactType = CONTACT_TYPE_AUTO_MAP[v.visitPurpose] || "buyer";
-    if(v.source===undefined) v.source = "agent";
-    if(v.phone){ var f = formatPhoneDisplay(v.phone); if(f) v.phone = f; }
-    /* Group vs. Visitor counting: every sign-in record is one Group; partySize is how many
-       people came with it. Records captured before this field existed default to 1 (the safe,
-       conservative assumption — never inflates historical visitor counts). */
-    if(!v.partySize) v.partySize = "1";
-    v.detail = migrateVisitorDetail(v.detail);
-  });
+}
+/* Same rationale for individual visitor records: any place a visitor record is adopted
+   from a serialized source (local storage OR a remote sync payload) must run it through
+   this exact normalizer, or a stale/foreign copy of a record can reintroduce missing fields. */
+function migrateVisitorRecord(v){
+  if(v.storyAnchor !== undefined){ if(v.reasonForVisit===undefined) v.reasonForVisit = v.storyAnchor; delete v.storyAnchor; }
+  if(v.reasonForVisit===undefined) v.reasonForVisit = "";
+  if(v.representationStatus === "has-agent") v.representationStatus = "represented";
+  if(v.representationStatus === "unsure") v.representationStatus = "not-discussed";
+  if(!v.representationStatus) v.representationStatus = "not-discussed";
+  if(!v.buyingTimeline) v.buyingTimeline = "unknown";
+  if(v.storyNote===undefined) v.storyNote = "";
+  if(v.visitPurpose===undefined) v.visitPurpose = "";
+  if(v.visitPurposeOther===undefined) v.visitPurposeOther = "";
+  if(!v.contactType) v.contactType = CONTACT_TYPE_AUTO_MAP[v.visitPurpose] || "buyer";
+  if(v.source===undefined) v.source = "agent";
+  if(v.phone){ var f = formatPhoneDisplay(v.phone); if(f) v.phone = f; }
+  /* Group vs. Visitor counting: every sign-in record is one Group; partySize is how many
+     people came with it. Records captured before this field existed default to 1 (the safe,
+     conservative assumption — never inflates historical visitor counts). */
+  if(!v.partySize) v.partySize = "1";
+  v.detail = migrateVisitorDetail(v.detail);
+  return v;
+}
+function migrateState(){
+  if(!state.settings) state.settings = { adminPasscode: "" };
+  if(!state.sync) state.sync = defaultSyncConfig();
+  state.content = deepMergeDefaults(state.content, CONTENT_DEFAULTS);
+  migrateContentShape();
+  state.visitors.forEach(migrateVisitorRecord);
   syncOptionListsFromContent();
 }
 migrateState();
@@ -3627,20 +3644,28 @@ var Sync = {
     state.openHouses = remote.openHouses || [];
     /* Firebase Realtime Database silently drops empty arrays/objects on write — a visitor
        with no tasks, no selected motivations, etc. comes back missing those keys entirely
-       rather than as []. Route every incoming visitor's detail back through the same
-       normalizer migrateState() uses for locally-loaded data, so the rest of the app can
-       keep assuming these fields always exist. */
-    state.visitors = (remote.visitors || []).map(function(v){
-      v.detail = migrateVisitorDetail(v.detail);
-      return v;
-    });
+       rather than as []. Route every incoming visitor record back through the exact same
+       normalizer migrateState() uses for locally-loaded data (migrateVisitorRecord — covers
+       migrateVisitorDetail plus partySize/contactType/etc. backfills), so the rest of the
+       app can keep assuming every field always exists regardless of where the record came from. */
+    state.visitors = (remote.visitors || []).map(migrateVisitorRecord);
     state.activeOpenHouseId = remote.activeOpenHouseId || null;
     state.content = deepMergeDefaults(remote.content || {}, CONTENT_DEFAULTS);
+    /* Critical: a remote snapshot can be older-code than this device (e.g. pushed by a
+       kiosk that hasn't reloaded yet). Run it through the same shape migrations as local
+       boot so a stale snapshot can never regress an already-upgraded structure — this is
+       what previously made "This Home"/"Their Home Search" vanish after sync pulled in an
+       old section list that only still recognized Follow-Up and Tasks by id. */
+    migrateContentShape();
     syncOptionListsFromContent();
     state._lastSyncedAt = remote.updatedAt;
     this.suppressPush = true;
     saveState();
     this.suppressPush = false;
+    /* Immediately push the corrected shape back up so every other device sharing this
+       room converges on the upgraded structure the next time it pulls, instead of waiting
+       on some unrelated future edit to trigger the next push. */
+    this.push();
     appEl.removeEventListener("click", globalClickHandler);
     render();
   },
