@@ -279,6 +279,24 @@ input,textarea,select{ font-family: inherit; }
 .ms-chips{ display:flex; flex-wrap:wrap; gap:6px; }
 .ms-chip{ background: var(--ink); color:#fff; font-size:12.5px; font-weight:600; padding:5px 11px; border-radius: var(--r-pill); }
 
+/* ---------- This Home / Their Home Search (Visitor Profile v2) ----------
+   Distinct-but-subtle visual identity: This Home cards carry a thin gold accent
+   (the app's existing "priority" gold), Their Home Search cards carry a neutral
+   charcoal accent — both stay within the black/white/neutral-gray foundation. */
+.th-field{ margin-bottom:16px; }
+.th-field label{ display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:9px; letter-spacing:.01em; }
+.section-card-thishome{ border-left:3px solid var(--gold); }
+.section-card-theirsearch{ border-left:3px solid var(--ink-soft); }
+.subsection-head{ margin:22px 0 10px; }
+.subsection-head h4{ font-family:var(--serif); font-size:16px; font-weight:700; color:var(--ink); }
+.star-row{ display:flex; gap:4px; }
+.star-btn{ background:none; border:none; padding:2px; font-size:30px; line-height:1; color:var(--line); transition:transform .12s var(--ease-spring); }
+.star-btn:active{ transform:scale(.88); }
+.star-btn.filled{ color:var(--gold); }
+.single-story-row{ display:flex; align-items:center; gap:10px; padding:2px 0; }
+.single-story-row input[type=checkbox]{ width:20px; height:20px; accent-color:var(--ink); flex:none; }
+.single-story-row label{ font-size:14.5px; color:var(--ink); font-weight:500; }
+
 /* ---------- Buyer Preferences ---------- */
 .pref-card-head{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
 .pref-card-head .glyph{ font-size:20px; line-height:1; }
@@ -353,6 +371,15 @@ input,textarea,select{ font-family: inherit; }
 .priority-card .pc-tag{ font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--gold); font-weight:700; margin-bottom:8px; }
 .priority-card h3{ color:#fff; font-size:20px; }
 .priority-card p{ color:rgba(255,255,255,.7); font-size:13.5px; margin-top:6px; line-height:1.5; }
+
+/* ---------- Analytics / Seller Report distribution bars ---------- */
+.dist-row{ margin-bottom:14px; }
+.dist-row:last-child{ margin-bottom:0; }
+.dist-row-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; font-size:14px; }
+.dist-label{ color:var(--ink); font-weight:600; }
+.dist-count{ color:var(--ink-faint); font-size:13px; font-weight:600; }
+.dist-bar-track{ height:8px; border-radius:5px; background:var(--mist-deep); overflow:hidden; }
+.dist-bar-fill{ height:100%; border-radius:5px; background:var(--ink); }
 
 /* ---------- Snapshot ---------- */
 .snap-block{ margin-bottom: 20px; }
@@ -565,16 +592,20 @@ var VISIT_REASONS = ["Downsizing","Relocating","First Home","Investor","Upsizing
    visitor records never lose their meaning even after the display text changes. */
 var TIMELINE_KEYS = ["unknown","0-3","3-6","6-12","browsing"];
 var REP_KEYS = ["represented","unrepresented","not-discussed"];
-var VISIT_PURPOSE_KEYS = ["buy","sell","both","neighbor","exploring","browsing"];
+var VISIT_PURPOSE_KEYS = ["buy","sell","both","neighbor","exploring","browsing","investing"];
 var CONTACT_TYPE_KEYS = ["buyer","seller","both","neighbor","investor","vendor","other"];
 
 var TIMELINES = [["unknown","Unknown"],["0-3","0–3 months"],["3-6","3–6 months"],["6-12","6–12 months"],["browsing","Just looking"]];
 var REP_STATUSES = [["represented","Represented"],["unrepresented","Unrepresented"],["not-discussed","Not Discussed"]];
-var VISIT_PURPOSES = [["buy","Looking to Buy"],["sell","Looking to Sell"],["both","Buying & Selling"],["neighbor","Neighbor"],["exploring","Exploring the Area"],["browsing","Just Browsing"]];
+var VISIT_PURPOSES = [["buy","Looking to Buy"],["sell","Looking to Sell"],["both","Buying & Selling"],["neighbor","Neighbor"],["exploring","Exploring the Area"],["browsing","Just Browsing"],["investing","Investing"]];
 var CONTACT_TYPES = [["buyer","Buyer"],["seller","Seller"],["both","Buy + Sell"],["neighbor","Neighbor"],["investor","Investor"],["vendor","Vendor"],["other","Other"]];
 /* Contact Type is auto-derived from what the visitor already told us at sign-in, so nobody
    has to stop and manually classify every guest. The agent can still tap the pill to correct it. */
-var CONTACT_TYPE_AUTO_MAP = { buy:"buyer", sell:"seller", both:"both", neighbor:"neighbor", exploring:"buyer", browsing:"buyer" };
+var CONTACT_TYPE_AUTO_MAP = { buy:"buyer", sell:"seller", both:"both", neighbor:"neighbor", exploring:"buyer", browsing:"buyer", investing:"investor" };
+
+/* "Real Estate Goal" (Their Home Search) reuses the visitPurpose field above — Investing was
+   added as a 7th option specifically for that purpose. "Timeline" reuses buyingTimeline. */
+var PARTY_SIZE_OPTIONS = ["1","2","3","4","5+"];
 
 var BEDS_OPTIONS = ["1","2","3","4","5","6+"];
 var BATHS_OPTIONS = ["1","1.5","2","2.5","3","3.5","4","4.5","5+"];
@@ -609,15 +640,36 @@ var LEGACY_V2_PREFERENCE_LIBRARY = ["Single Story","Primary Bedroom on First Flo
   "Solar Owned","Quiet Street","Good School District","Close to Parks","Close to Shopping","Other"];
 
 var FINANCING_TYPES = ["Cash","Conventional","FHA","VA","USDA","Jumbo","Unknown"];
-var PREAPPROVAL_STATUSES = ["Pre-Approved","Speaking With Lender","Needs Lender","Not Started","Unknown"];
+/* Pre-Approval Status is reused as "Financing Status" under Their Home Search — Cash was
+   folded in so a cash buyer's status can be captured in this same field. */
+var PREAPPROVAL_STATUSES = ["Cash","Pre-Approved","Speaking With Lender","Needs Lender","Not Started","Unknown"];
 var HOUSEHOLD_SIZES = ["1","2","3","4","5","6+"];
 var CHILDREN_STATUSES = ["Yes","No","Not Discussed"];
 var PET_OPTIONS = ["Dog","Cat","Multiple Pets","No Pets","Not Discussed"];
 var PET_EXCLUSIVE = ["No Pets","Not Discussed"];
-var DEALBREAKER_OPTIONS = ["Busy Street","High HOA","High Mello-Roos","Two Story","Small Kitchen","Small Backyard","Poor Layout","Major Renovation Needed","No Garage","Limited Parking","Freeway Noise","Railroad Noise","Too Far From Work","HOA Restrictions"];
+/* Reused as "This Home > Concerns / What They Didn't Like" — expanded from the original
+   14-item list into a fuller set of property-feedback concerns. */
+var DEALBREAKER_OPTIONS = ["Busy Street","High HOA","High Mello-Roos","Two Story","Small Kitchen","Small Backyard","Poor Layout","Major Renovation Needed","No Garage","Limited Parking","Freeway Noise","Railroad Noise","Too Far From Work","HOA Restrictions","Small Bedrooms","Dated Kitchen","Dated Bathrooms","Needs Cosmetic Work","Steep Driveway/Stairs","Not Enough Storage","Busy Intersection","Priced Too High","Lot Size Too Small","Dated Finishes Throughout","Backs to Commercial/Busy Road","Backs Directly to Neighbors"];
 var NEXT_ACTIONS = ["Call","Text","Email","Send Listings","Send Property Information","Lender Introduction","Schedule Buyer Consultation","Schedule Seller Consultation","Schedule Showing","Long-Term Follow-Up","No Follow-Up Needed"];
 var ASSIGNEES = ["Jacy","Rich","Shared","Other DAG Team Member","Unassigned"];
 var FOLLOWUP_STATUSES = ["Not Started","In Progress","Completed"];
+var LEAD_TEMPERATURE_OPTIONS = ["Hot","Warm","Cold"];
+var PREFERRED_CONTACT_METHOD_OPTIONS = ["Call","Text","Email","No Preference"];
+
+/* ---- This Home (fast-tap feedback about the property being hosted today) ---- */
+var THIS_HOME_LIKED_OPTIONS = ["Kitchen","Backyard / Outdoor Space","Floor Plan","Natural Light","Primary Suite","Curb Appeal","Location","Size / Square Footage","Storage","Recent Updates","Neighborhood","Views","Garage","Price","Move-In Ready Condition"];
+var INTEREST_LEVEL_OPTIONS = ["Very Interested","Interested","Neutral","Not Interested"];
+var WOULD_CONSIDER_OFFER_OPTIONS = ["Yes","Maybe","No","Too Early to Say"];
+var PRICE_REACTION_OPTIONS = ["Feels Like Great Value","Feels Fairly Priced","Feels A Bit High","Feels Overpriced"];
+var FIT_OPTIONS = ["Excellent Fit","Good Fit","Some Concerns","Not The Right Fit"];
+
+/* ---- Their Home Search (personal search criteria, independent of today's property) ---- */
+var CURRENT_HOUSING_OPTIONS = ["Own", "Rent", "Living With Family", "Other"];
+var PROPERTY_TYPE_OPTIONS = ["Single Family","Condo","Townhouse","Multi-Family","Land","New Construction","Other"];
+var STORIES_OPTIONS = ["Single Story","Two Story","Either / No Preference"];
+var GARAGE_PARKING_OPTIONS = ["1 Car","2 Car","3+ Car","Carport","Street Parking Only","Not Discussed"];
+var MUST_HAVE_OPTIONS = ["Move-In Ready","Updated Kitchen","Primary Bedroom Downstairs","Home Office","Large Backyard","Pool","3-Car Garage","Good School District","Low HOA","Quiet Street","Open Floor Plan","Guest Room / Casita"];
+var SEARCH_DEALBREAKER_OPTIONS = ["Busy Street","No Garage","HOA","Small Lot","Steep Driveway","Shared Walls","No Yard","Flood Zone / Insurance","Long Commute","Older Roof/HVAC/Plumbing","Power Lines","Backs to Major Road"];
 
 /* ============================================================
    CONTENT DEFAULTS — every override-able string, format, brand
@@ -708,20 +760,39 @@ var CONTENT_DEFAULTS = {
       title: "Visitor",
       captureBannerText: "This visitor needs a few more notes.",
       captureBannerButton: "Mark Complete",
+      sectionThisHome: "This Home",
+      sectionTheirHomeSearch: "Their Home Search",
       sectionMotivation: "Motivation",
-      sectionPreferences: "Buyer Preferences",
-      sectionPreferredAreas: "Preferred Areas",
-      sectionFinancing: "Financing",
+      sectionPreferences: "Must-Haves & Nice-to-Haves",
+      sectionPreferredAreas: "Areas Interested In",
+      sectionFinancing: "Financing & Budget",
       sectionFamily: "Family",
       sectionPets: "Pets",
-      sectionDealBreakers: "Deal Breakers",
+      sectionDealBreakers: "What They Didn't Like",
+      sectionSearchDealBreakers: "Deal Breakers",
       sectionFollowUp: "Follow-Up",
-      sectionConnectionSummary: "Connection Summary",
+      sectionConnectionSummary: "Personal Search Notes",
       sectionTasks: "Tasks",
       markFollowUpDoneButton: "Mark Follow-Up Done",
       markFollowUpUndoButton: "Marked Done — Undo",
       addTaskButton: "Add",
       addTaskPlaceholder: "Add a task..."
+    },
+    analytics: {
+      title: "Open House Analytics",
+      groupsLabel: "Groups",
+      visitorsLabel: "Total Visitors",
+      avgRatingLabel: "Average Rating",
+      internalHeading: "For your team only — never shared with the seller.",
+      sellerReportButton: "View Seller Report",
+      emptyTitle: "No feedback captured yet",
+      emptyBody: "This Home feedback will appear here as visitors sign in."
+    },
+    sellerReport: {
+      title: "Seller Report",
+      subtitle: "A summary of buyer feedback from today's open house — no personal information included.",
+      copyButton: "Copy Report",
+      whatWeHeardHeading: "What We Heard"
     },
     wrapup: {
       title: "Wrap-Up",
@@ -785,9 +856,25 @@ var CONTENT_DEFAULTS = {
     childrenStatuses: CHILDREN_STATUSES.slice(),
     reasonsForVisit: VISIT_REASONS.slice(),
     preferredAreaSeed: PREFERRED_AREA_SEED.slice(),
+    leadTemperatureOptions: LEAD_TEMPERATURE_OPTIONS.slice(),
+    preferredContactMethodOptions: PREFERRED_CONTACT_METHOD_OPTIONS.slice(),
+    thisHomeLikedOptions: THIS_HOME_LIKED_OPTIONS.slice(),
+    interestLevelOptions: INTEREST_LEVEL_OPTIONS.slice(),
+    wouldConsiderOfferOptions: WOULD_CONSIDER_OFFER_OPTIONS.slice(),
+    priceReactionOptions: PRICE_REACTION_OPTIONS.slice(),
+    fitOptions: FIT_OPTIONS.slice(),
+    currentHousingOptions: CURRENT_HOUSING_OPTIONS.slice(),
+    propertyTypeOptions: PROPERTY_TYPE_OPTIONS.slice(),
+    storiesOptions: STORIES_OPTIONS.slice(),
+    garageParkingOptions: GARAGE_PARKING_OPTIONS.slice(),
+    mustHaveOptions: MUST_HAVE_OPTIONS.slice(),
+    searchDealBreakerOptions: SEARCH_DEALBREAKER_OPTIONS.slice(),
     archived: {
       motivations: [], petOptions: [], dealBreakerOptions: [], financingTypes: [], preApprovalStatuses: [],
-      nextActions: [], followUpStatuses: [], householdSizes: [], childrenStatuses: [], reasonsForVisit: [], preferredAreaSeed: []
+      nextActions: [], followUpStatuses: [], householdSizes: [], childrenStatuses: [], reasonsForVisit: [], preferredAreaSeed: [],
+      leadTemperatureOptions: [], preferredContactMethodOptions: [], thisHomeLikedOptions: [], interestLevelOptions: [],
+      wouldConsiderOfferOptions: [], priceReactionOptions: [], fitOptions: [], currentHousingOptions: [], propertyTypeOptions: [],
+      storiesOptions: [], garageParkingOptions: [], mustHaveOptions: [], searchDealBreakerOptions: []
     },
     contactTypes: CONTACT_TYPE_KEYS.map(function(k,i){ return { key:k, label:CONTACT_TYPES[i][1], active:true }; }),
     visitPurposes: VISIT_PURPOSE_KEYS.map(function(k,i){ return { key:k, label:VISIT_PURPOSES[i][1], active:true }; }),
@@ -809,15 +896,9 @@ var CONTENT_DEFAULTS = {
       {id:"representation", label:"Representation Status", visible:true}
     ],
     visitorDetail: [
-      {id:"motivation", label:"Motivation", visible:true},
-      {id:"preferences", label:"Buyer Preferences", visible:true},
-      {id:"preferredAreas", label:"Preferred Areas", visible:true},
-      {id:"financing", label:"Financing", visible:true},
-      {id:"family", label:"Family", visible:true},
-      {id:"pets", label:"Pets", visible:true},
-      {id:"dealBreakers", label:"Deal Breakers", visible:true},
+      {id:"thisHome", label:"This Home", visible:true},
+      {id:"theirHomeSearch", label:"Their Home Search", visible:true},
       {id:"followUp", label:"Follow-Up", visible:true},
-      {id:"connectionSummary", label:"Connection Summary", visible:true},
       {id:"tasks", label:"Tasks", visible:true}
     ],
     snapshotDetail: [
@@ -849,12 +930,22 @@ var CONTENT_DEFAULTS = {
       {id:"householdSize", label:"Household Size", visible:true, required:false},
       {id:"children", label:"Children", visible:true, required:false},
       {id:"financingType", label:"Financing Type", visible:true, required:false},
-      {id:"preApproval", label:"Pre-Approval Status", visible:true, required:false},
+      {id:"preApproval", label:"Financing Status", visible:true, required:false},
       {id:"followUpNextAction", label:"Next Action", visible:true, required:true},
       {id:"followUpDate", label:"Follow-Up Date", visible:true, required:false},
       {id:"followUpAssignedTo", label:"Assigned To", visible:true, required:false},
       {id:"followUpStatus", label:"Follow-Up Status", visible:true, required:false},
-      {id:"connectionSummary", label:"Connection Summary", visible:true, required:false}
+      {id:"connectionSummary", label:"Personal Search Notes", visible:true, required:false},
+      {id:"leadTemperature", label:"Lead Temperature", visible:true, required:false},
+      {id:"preferredContactMethod", label:"Preferred Contact Method", visible:true, required:false},
+      {id:"interestLevel", label:"Interest Level (This Home)", visible:true, required:false},
+      {id:"wouldConsiderOffer", label:"Would Consider Offer (This Home)", visible:true, required:false},
+      {id:"priceReaction", label:"Price Reaction (This Home)", visible:true, required:false},
+      {id:"fit", label:"Overall Fit (This Home)", visible:true, required:false},
+      {id:"currentHousing", label:"Current Housing", visible:true, required:false},
+      {id:"propertyType", label:"Property Type", visible:true, required:false},
+      {id:"stories", label:"Stories", visible:true, required:false},
+      {id:"garageParking", label:"Garage / Parking", visible:true, required:false}
     ]
   }
 };
@@ -935,6 +1026,19 @@ function syncOptionListsFromContent(){
   syncArrayInPlace(CHILDREN_STATUSES, ol.childrenStatuses);
   syncArrayInPlace(VISIT_REASONS, ol.reasonsForVisit);
   syncArrayInPlace(PREFERRED_AREA_SEED, ol.preferredAreaSeed);
+  syncArrayInPlace(LEAD_TEMPERATURE_OPTIONS, ol.leadTemperatureOptions);
+  syncArrayInPlace(PREFERRED_CONTACT_METHOD_OPTIONS, ol.preferredContactMethodOptions);
+  syncArrayInPlace(THIS_HOME_LIKED_OPTIONS, ol.thisHomeLikedOptions);
+  syncArrayInPlace(INTEREST_LEVEL_OPTIONS, ol.interestLevelOptions);
+  syncArrayInPlace(WOULD_CONSIDER_OFFER_OPTIONS, ol.wouldConsiderOfferOptions);
+  syncArrayInPlace(PRICE_REACTION_OPTIONS, ol.priceReactionOptions);
+  syncArrayInPlace(FIT_OPTIONS, ol.fitOptions);
+  syncArrayInPlace(CURRENT_HOUSING_OPTIONS, ol.currentHousingOptions);
+  syncArrayInPlace(PROPERTY_TYPE_OPTIONS, ol.propertyTypeOptions);
+  syncArrayInPlace(STORIES_OPTIONS, ol.storiesOptions);
+  syncArrayInPlace(GARAGE_PARKING_OPTIONS, ol.garageParkingOptions);
+  syncArrayInPlace(MUST_HAVE_OPTIONS, ol.mustHaveOptions);
+  syncArrayInPlace(SEARCH_DEALBREAKER_OPTIONS, ol.searchDealBreakerOptions);
   CONTACT_TYPES.length = 0; (ol.contactTypes||[]).filter(function(o){ return o.active!==false; }).forEach(function(o){ CONTACT_TYPES.push([o.key, o.label]); });
   VISIT_PURPOSES.length = 0; (ol.visitPurposes||[]).filter(function(o){ return o.active!==false; }).forEach(function(o){ VISIT_PURPOSES.push([o.key, o.label]); });
   TIMELINES.length = 0; (ol.timelines||[]).filter(function(o){ return o.active!==false; }).forEach(function(o){ TIMELINES.push([o.key, o.label]); });
@@ -961,6 +1065,45 @@ function migrateTeamMemberShape(){
   }
 }
 
+/* ---- Open House Command Center upgrade: append any brand-new default items into option
+   lists that already existed on a device (existing users' saved arrays are never replaced
+   wholesale — only items truly missing, and not already archived, are added). ---- */
+function mergeNewSimpleOptionItems(listKey, defaultItems){
+  var ol = state.content.optionLists;
+  var list = ol[listKey] || (ol[listKey] = []);
+  var archived = (ol.archived && ol.archived[listKey]) || [];
+  defaultItems.forEach(function(item){
+    if(list.indexOf(item)===-1 && archived.indexOf(item)===-1) list.push(item);
+  });
+}
+function mergeNewKeyedOption(listKey, key, label){
+  var ol = state.content.optionLists;
+  var list = ol[listKey] || (ol[listKey] = []);
+  if(!list.some(function(o){ return o.key===key; })) list.push({ key:key, label:label, active:true });
+}
+/* Section ids for the Visitor Profile fundamentally changed meaning (old: motivation/preferences/
+   preferredAreas/financing/family/pets/dealBreakers/followUp/connectionSummary/tasks — new: two
+   unified This Home / Their Home Search sections + Follow-Up + Tasks), so an existing saved
+   order/visibility list is replaced with the new defaults rather than merged. Nothing about the
+   visitor data itself changes — this only resets show/hide/reorder preferences for this screen. */
+function migrateVisitorDetailSectionsV2(){
+  var list = state.content.sections.visitorDetail || [];
+  var isOldShape = list.some(function(s){ return s.id==="motivation" || s.id==="preferences" || s.id==="dealBreakers"; });
+  if(isOldShape || !list.length){
+    state.content.sections.visitorDetail = JSON.parse(JSON.stringify(CONTENT_DEFAULTS.sections.visitorDetail));
+  }
+}
+/* Field-level controls are purely additive — any newly-meaningful field just needs an entry
+   appended so it becomes visible in Section & Field Controls; existing customizations for
+   already-known fields are left untouched. */
+function mergeNewFieldConfigs(pageKey){
+  var list = fieldConfigFor(pageKey);
+  var existingIds = list.map(function(f){ return f.id; });
+  (CONTENT_DEFAULTS.fields[pageKey]||[]).forEach(function(def){
+    if(existingIds.indexOf(def.id)===-1) list.push(JSON.parse(JSON.stringify(def)));
+  });
+}
+
 /* ============================================================
    OPTION MANAGER — generic add/archive/delete/reorder helpers.
    "Delete" only ever hard-removes an option that is provably not
@@ -981,6 +1124,19 @@ function isSimpleOptionInUse(listKey, value){
     case "householdSizes": return state.visitors.some(function(v){ return v.detail.family.householdSize===value; });
     case "childrenStatuses": return state.visitors.some(function(v){ return v.detail.family.children===value; });
     case "reasonsForVisit": return state.visitors.some(function(v){ return v.reasonForVisit===value; });
+    case "leadTemperatureOptions": return state.visitors.some(function(v){ return v.detail.followUp.leadTemperature===value; });
+    case "preferredContactMethodOptions": return state.visitors.some(function(v){ return v.detail.followUp.preferredContactMethod===value; });
+    case "thisHomeLikedOptions": return state.visitors.some(function(v){ return (v.detail.thisHome.liked||[]).indexOf(value)>-1; });
+    case "interestLevelOptions": return state.visitors.some(function(v){ return v.detail.thisHome.interestLevel===value; });
+    case "wouldConsiderOfferOptions": return state.visitors.some(function(v){ return v.detail.thisHome.wouldConsiderOffer===value; });
+    case "priceReactionOptions": return state.visitors.some(function(v){ return v.detail.thisHome.priceReaction===value; });
+    case "fitOptions": return state.visitors.some(function(v){ return v.detail.thisHome.fit===value; });
+    case "currentHousingOptions": return state.visitors.some(function(v){ return v.detail.currentHousing===value; });
+    case "propertyTypeOptions": return state.visitors.some(function(v){ return (v.detail.propertyType||[]).indexOf(value)>-1; });
+    case "storiesOptions": return state.visitors.some(function(v){ return v.detail.stories===value; });
+    case "garageParkingOptions": return state.visitors.some(function(v){ return v.detail.garageParking===value; });
+    case "mustHaveOptions": return state.visitors.some(function(v){ return (v.detail.mustHaves.selected||[]).indexOf(value)>-1; });
+    case "searchDealBreakerOptions": return state.visitors.some(function(v){ return (v.detail.searchDealBreakers.selected||[]).indexOf(value)>-1; });
     default: return false;
   }
 }
@@ -1171,13 +1327,31 @@ function migrateVisitorDetail(old){
     old.mustHaves = obj(old.mustHaves); old.mustHaves.selected = arr(old.mustHaves.selected); old.mustHaves.note = old.mustHaves.note || "";
     old.niceToHaves = obj(old.niceToHaves); old.niceToHaves.selected = arr(old.niceToHaves.selected); old.niceToHaves.note = old.niceToHaves.note || "";
     old.motivation = obj(old.motivation); old.motivation.selected = arr(old.motivation.selected); old.motivation.note = old.motivation.note || "";
-    old.financing = obj(old.financing); old.financing.type = old.financing.type || ""; old.financing.preApproval = old.financing.preApproval || ""; old.financing.lenderNotes = old.financing.lenderNotes || "";
+    old.financing = obj(old.financing); old.financing.type = old.financing.type || ""; old.financing.preApproval = old.financing.preApproval || ""; old.financing.lenderNotes = old.financing.lenderNotes || ""; old.financing.budgetMin = old.financing.budgetMin || ""; old.financing.budgetMax = old.financing.budgetMax || "";
     old.family = obj(old.family); old.family.householdSize = old.family.householdSize || ""; old.family.children = old.family.children || "Not Discussed"; old.family.note = old.family.note || "";
     old.pets = obj(old.pets); old.pets.selected = arr(old.pets.selected); old.pets.note = old.pets.note || "";
     old.dealBreakers = obj(old.dealBreakers); old.dealBreakers.selected = arr(old.dealBreakers.selected); old.dealBreakers.note = old.dealBreakers.note || "";
-    old.followUp = obj(old.followUp); old.followUp.promise = old.followUp.promise || ""; old.followUp.nextAction = old.followUp.nextAction || ""; old.followUp.date = old.followUp.date || ""; old.followUp.assignedTo = old.followUp.assignedTo || ""; old.followUp.status = old.followUp.status || "Not Started";
+    old.followUp = obj(old.followUp); old.followUp.promise = old.followUp.promise || ""; old.followUp.nextAction = old.followUp.nextAction || ""; old.followUp.date = old.followUp.date || ""; old.followUp.assignedTo = old.followUp.assignedTo || ""; old.followUp.status = old.followUp.status || "Not Started"; old.followUp.leadTemperature = old.followUp.leadTemperature || ""; old.followUp.preferredContactMethod = old.followUp.preferredContactMethod || "";
     old.preferredAreas = arr(old.preferredAreas);
     old.connectionSummary = old.connectionSummary || "";
+    old.thisHome = obj(old.thisHome);
+    old.thisHome.rating = old.thisHome.rating || 0;
+    old.thisHome.interestLevel = old.thisHome.interestLevel || "";
+    old.thisHome.wouldConsiderOffer = old.thisHome.wouldConsiderOffer || "";
+    old.thisHome.liked = arr(old.thisHome.liked);
+    old.thisHome.likedNote = old.thisHome.likedNote || "";
+    old.thisHome.priceReaction = old.thisHome.priceReaction || "";
+    old.thisHome.priceConsider = old.thisHome.priceConsider || "";
+    old.thisHome.fit = old.thisHome.fit || "";
+    old.thisHome.notes = old.thisHome.notes || "";
+    old.currentHousing = old.currentHousing || "";
+    old.propertyType = arr(old.propertyType);
+    old.stories = old.stories || "";
+    old.singleStoryRequired = !!old.singleStoryRequired;
+    old.desiredBeds = old.desiredBeds || "";
+    old.desiredBaths = old.desiredBaths || "";
+    old.garageParking = old.garageParking || "";
+    old.searchDealBreakers = obj(old.searchDealBreakers); old.searchDealBreakers.selected = arr(old.searchDealBreakers.selected); old.searchDealBreakers.note = old.searchDealBreakers.note || "";
     old.tasks = arr(old.tasks).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; });
     old.notesComplete = !!old.notesComplete;
     return old;
@@ -1244,6 +1418,10 @@ function migrateVisitorDetail(old){
   var otherLegacy = legacyExtras.filter(function(s){ return s.indexOf("Must-Have")!==0; });
   if(otherLegacy.length) connectionSummary = (connectionSummary ? connectionSummary+"\n\n" : "") + otherLegacy.join("\n");
 
+  followUp.leadTemperature = followUp.leadTemperature || "";
+  followUp.preferredContactMethod = followUp.preferredContactMethod || "";
+  financing.budgetMin = financing.budgetMin || ""; financing.budgetMax = financing.budgetMax || "";
+
   return {
     motivation: { selected: motivationSelected, note: motivationNote },
     mustHaves: mustHaves,
@@ -1255,6 +1433,10 @@ function migrateVisitorDetail(old){
     followUp: followUp,
     preferredAreas: arr(old.preferredAreas),
     connectionSummary: connectionSummary,
+    thisHome: { rating:0, interestLevel:"", wouldConsiderOffer:"", liked:[], likedNote:"", priceReaction:"", priceConsider:"", fit:"", notes:"" },
+    currentHousing: "", propertyType: [], stories: "", singleStoryRequired: false,
+    desiredBeds: "", desiredBaths: "", garageParking: "",
+    searchDealBreakers: { selected: [], note: "" },
     tasks: arr(old.tasks).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; }),
     notesComplete: !!old.notesComplete
   };
@@ -1278,6 +1460,11 @@ function migrateState(){
   migrateKeyedListShape("timelines", "timelineLabels", TIMELINE_KEYS);
   migrateKeyedListShape("representations", "representationLabels", REP_KEYS);
   migrateTeamMemberShape();
+  mergeNewKeyedOption("visitPurposes", "investing", "Investing");
+  mergeNewSimpleOptionItems("dealBreakerOptions", DEALBREAKER_OPTIONS);
+  mergeNewSimpleOptionItems("preApprovalStatuses", PREAPPROVAL_STATUSES);
+  migrateVisitorDetailSectionsV2();
+  mergeNewFieldConfigs("visitorDetailSimple");
   state.visitors.forEach(function(v){
     if(v.storyAnchor !== undefined){ if(v.reasonForVisit===undefined) v.reasonForVisit = v.storyAnchor; delete v.storyAnchor; }
     if(v.reasonForVisit===undefined) v.reasonForVisit = "";
@@ -1291,6 +1478,10 @@ function migrateState(){
     if(!v.contactType) v.contactType = CONTACT_TYPE_AUTO_MAP[v.visitPurpose] || "buyer";
     if(v.source===undefined) v.source = "agent";
     if(v.phone){ var f = formatPhoneDisplay(v.phone); if(f) v.phone = f; }
+    /* Group vs. Visitor counting: every sign-in record is one Group; partySize is how many
+       people came with it. Records captured before this field existed default to 1 (the safe,
+       conservative assumption — never inflates historical visitor counts). */
+    if(!v.partySize) v.partySize = "1";
     v.detail = migrateVisitorDetail(v.detail);
   });
   syncOptionListsFromContent();
@@ -1340,18 +1531,41 @@ function newVisitor(openHouseId, data, capturedLater){
     representationStatus: data.representationStatus || "not-discussed",
     visitPurpose: data.visitPurpose || "",
     visitPurposeOther: data.visitPurposeOther || "",
+    /* One sign-in record = one Group; partySize is how many people are in that group
+       (couple + child = partySize "3"). Drives the Group-vs-Visitor counts in Analytics. */
+    partySize: data.partySize || "1",
     capturedLater: !!capturedLater,
     detail: {
       motivation: { selected:[], note:"" },
       mustHaves: { selected:[], note:"" },
       niceToHaves: { selected:[], note:"" },
-      financing: { type:"", preApproval:"", lenderNotes:"" },
+      financing: { type:"", preApproval:"", lenderNotes:"", budgetMin:"", budgetMax:"" },
       family: { householdSize:"", children:"Not Discussed", note:"" },
       pets: { selected:[], note:"" },
+      /* Reused as "This Home > What They Didn't Like / Concerns" — see thisHome below. */
       dealBreakers: { selected:[], note:"" },
-      followUp: { promise:"", nextAction:"", date:"", assignedTo:"", status:"Not Started" },
+      followUp: { promise:"", nextAction:"", date:"", assignedTo:"", status:"Not Started", leadTemperature:"", preferredContactMethod:"" },
       preferredAreas: [],
       connectionSummary: "",
+      /* ---- This Home: fast-tap feedback about the property being hosted today ---- */
+      thisHome: {
+        rating: 0,
+        interestLevel: "",
+        wouldConsiderOffer: "",
+        liked: [], likedNote: "",
+        priceReaction: "", priceConsider: "",
+        fit: "",
+        notes: ""
+      },
+      /* ---- Their Home Search: personal search criteria, independent of today's property ---- */
+      currentHousing: "",
+      propertyType: [],
+      stories: "",
+      singleStoryRequired: false,
+      desiredBeds: "",
+      desiredBaths: "",
+      garageParking: "",
+      searchDealBreakers: { selected:[], note:"" },
       /* Every new visitor record — sign-in kiosk or agent quick capture — gets these
          two follow-up tasks automatically, so nothing depends on an agent remembering
          to add them by hand. */
@@ -1710,6 +1924,8 @@ function render(){
     case "wrapup": html = screenWrapup(); break;
     case "snapshots": html = screenSnapshots(); break;
     case "snapshotDetail": html = screenSnapshotDetail(); break;
+    case "analytics": html = screenOpenHouseAnalytics(); break;
+    case "sellerReport": html = screenSellerReport(); break;
     case "signin": html = screenSignIn(); break;
     case "settings": html = screenAdminSettings(); break;
     default: html = screenWelcome();
@@ -2188,6 +2404,11 @@ function screenSignIn(){
         (phoneF.visible!==false ? '<div class="field"><label>Phone'+(phoneF.required?' <span class="req-mark">*</span>':'')+'</label><input type="tel" id="s-phone" placeholder="'+esc(cfg("signin.phonePlaceholder"))+'" inputmode="tel"></div>' : '') +
         (emailF.visible!==false ? '<div class="field" style="margin-bottom:0;"><label>Email'+(emailF.required?' <span class="req-mark">*</span>':'')+'</label><input type="email" id="s-email" placeholder="'+esc(cfg("signin.emailPlaceholder"))+'"></div>' : '') +
       '</div>' +
+      '<div class="field" style="margin-bottom:0;margin-top:16px;"><label>How Many In Your Group?</label>' +
+        '<div class="toggle-row" id="s-party">' +
+          PARTY_SIZE_OPTIONS.map(function(n){ return '<button type="button" class="chip'+(n==="1"?" selected":"")+'" data-val="'+n+'">'+n+'</button>'; }).join("") +
+        '</div>' +
+      '</div>' +
     '</div>';
 
   var blocks = {
@@ -2228,10 +2449,11 @@ function screenSignIn(){
 function mountSignIn(){
   var oh = activeOpenHouse();
   if(!oh) return;
-  var picked = { representationStatus:"", visitPurpose:"" };
+  var picked = { representationStatus:"", visitPurpose:"", partySize:"1" };
 
   var repGroup = document.querySelector("#s-rep");
   var purposeGroup = document.querySelector("#s-purpose");
+  var partyGroup = document.querySelector("#s-party");
   var phoneInput = document.querySelector("#s-phone");
   if(phoneInput){ bindPhoneInput(phoneInput); }
   initAutosizeTextareas(document);
@@ -2248,6 +2470,16 @@ function mountSignIn(){
   }
   wire(repGroup, "representationStatus");
   wire(purposeGroup, "visitPurpose");
+  /* Party size always keeps exactly one selection (defaults to "1") — tapping the same
+     chip again doesn't clear it, since a group size of zero doesn't make sense. */
+  if(partyGroup){
+    partyGroup.addEventListener("click", function(e){
+      var btn = e.target.closest(".chip"); if(!btn) return;
+      Array.prototype.forEach.call(partyGroup.querySelectorAll(".chip"), function(c){ c.classList.remove("selected"); });
+      picked.partySize = btn.getAttribute("data-val");
+      btn.classList.add("selected");
+    });
+  }
 
   var submitBtn = document.querySelector("#s-submit");
   if(submitBtn){
@@ -2269,6 +2501,7 @@ function mountSignIn(){
         representationStatus: picked.representationStatus,
         visitPurpose: picked.visitPurpose,
         visitPurposeOther: otherEl ? otherEl.value.trim() : "",
+        partySize: picked.partySize,
         source: "selfSignIn"
       }, true);
       state.visitors.push(v);
@@ -2323,7 +2556,8 @@ function screenWorkspace(){
         '</div>' +
       '</div>' +
 
-      '<div style="margin-top:28px;">' +
+      '<div style="margin-top:28px;display:flex;flex-direction:column;gap:12px;">' +
+        '<button class="btn btn-secondary" data-nav="analytics" data-id="'+oh.id+'">'+esc(cfg("pages.analytics.title"))+'</button>' +
         '<button class="btn btn-secondary" data-nav="wrapup">'+esc(wp.wrapupButton)+'</button>' +
       '</div>' +
     '</div>' +
@@ -2362,7 +2596,7 @@ function visitorCardHtml(v){
 function sheetQuickCapture(){
   var oh = activeOpenHouse();
   if(!oh) return;
-  var picked = { reasonForVisit:"", buyingTimeline:"", representationStatus:"" };
+  var picked = { reasonForVisit:"", buyingTimeline:"", representationStatus:"", partySize:"1" };
 
   var qNameF = fieldCfg("quickCapture","name"), qPhoneF = fieldCfg("quickCapture","phone"),
       qEmailF = fieldCfg("quickCapture","email"), qStoryF = fieldCfg("quickCapture","storyNote");
@@ -2373,7 +2607,10 @@ function sheetQuickCapture(){
       '<div class="field-row">' +
         (qPhoneF.visible!==false ? '<div class="field"><label>Phone'+(qPhoneF.required?' <span class="req-mark">*</span>':'')+'</label><input type="tel" id="q-phone" placeholder="(555) 012-3456" inputmode="tel"></div>' : '') +
         (qEmailF.visible!==false ? '<div class="field"><label>Email'+(qEmailF.required?' <span class="req-mark">*</span>':'')+'</label><input type="email" id="q-email" placeholder="'+esc(cfg("quickCapture.emailPlaceholder"))+'"></div>' : '') +
-      '</div>',
+      '</div>' +
+      '<div class="field" style="margin-bottom:0;"><label>How Many In Their Group?</label><div class="toggle-row" id="q-party">' +
+        PARTY_SIZE_OPTIONS.map(function(n){ return '<button type="button" class="chip'+(n==="1"?" selected":"")+'" data-val="'+n+'">'+n+'</button>'; }).join("") +
+      '</div></div>',
     reason: '<div class="field"><label>'+esc(cfg("quickCapture.reasonLabel"))+'</label><div class="chip-group" id="q-reason">' +
         VISIT_REASONS.map(function(s){ return '<button type="button" class="chip" data-val="'+esc(s)+'">'+esc(s)+'</button>'; }).join("") +
       '</div></div>',
@@ -2414,6 +2651,15 @@ function sheetQuickCapture(){
     wireChips("#q-reason","reasonForVisit");
     wireChips("#q-timeline","buyingTimeline");
     wireChips("#q-rep","representationStatus");
+    var qPartyGroup = sheet.querySelector("#q-party");
+    if(qPartyGroup){
+      qPartyGroup.addEventListener("click", function(e){
+        var btn = e.target.closest(".chip"); if(!btn) return;
+        Array.prototype.forEach.call(qPartyGroup.querySelectorAll(".chip"), function(c){ c.classList.remove("selected"); });
+        picked.partySize = btn.getAttribute("data-val");
+        btn.classList.add("selected");
+      });
+    }
 
     function val(sel){ var el = sheet.querySelector(sel); return el ? el.value.trim() : ""; }
     function gather(){
@@ -2425,6 +2671,7 @@ function sheetQuickCapture(){
         reasonForVisit: picked.reasonForVisit,
         buyingTimeline: picked.buyingTimeline,
         representationStatus: picked.representationStatus,
+        partySize: picked.partySize,
         source: "agent"
       };
     }
@@ -2512,11 +2759,19 @@ function prefCategoryChipsHtml(cardKey, selectedArr){
    Tapping the field opens a sheet with the full option list; once closed, the field itself
    only ever shows the options that were actually picked (or a placeholder), never the whole list. */
 var MULTI_SELECT_CONFIG = {
-  motivation:    { title:"Motivation",      path:"motivation.selected",    flat: MOTIVATION_OPTIONS,       placeholder:"Select motivation(s)…" },
-  dealBreakers:  { title:"Deal Breakers",    path:"dealBreakers.selected",  flat: DEALBREAKER_OPTIONS,      placeholder:"Select deal breaker(s)…" },
-  mustHaves:     { title:"Must-Haves",       path:"mustHaves.selected",     grouped: PREFERENCE_CATEGORIES, otherKey:"niceToHaves", placeholder:"Select must-have(s)…" },
-  niceToHaves:   { title:"Nice-to-Haves",    path:"niceToHaves.selected",   grouped: PREFERENCE_CATEGORIES, otherKey:"mustHaves",   placeholder:"Select nice-to-have(s)…" },
-  pets:          { title:"Pets",             path:"pets.selected",          flat: PET_OPTIONS,               exclusive: PET_EXCLUSIVE, placeholder:"Select pet detail(s)…" }
+  motivation:    { title:"Motivation",              path:"motivation.selected",           flat: MOTIVATION_OPTIONS,       placeholder:"Select motivation(s)…" },
+  /* Reused as This Home > "What They Didn't Like / Concerns" — path unchanged so existing
+     saved deal-breaker selections carry forward as-is. */
+  dealBreakers:  { title:"What They Didn't Like",   path:"dealBreakers.selected",         flat: DEALBREAKER_OPTIONS,      placeholder:"Select concern(s)…" },
+  /* Must-Haves now lives under Their Home Search with its own flat suggested-chip list
+     (previously grouped by category) — legacy grouped selections still display fine since
+     multiSelectFieldHtml only ever renders the stored values, regardless of the option source. */
+  mustHaves:     { title:"Must-Haves",              path:"mustHaves.selected",            flat: MUST_HAVE_OPTIONS,        otherKey:"niceToHaves", placeholder:"Select must-have(s)…" },
+  niceToHaves:   { title:"Nice-to-Haves",            path:"niceToHaves.selected",          grouped: PREFERENCE_CATEGORIES, otherKey:"mustHaves",   placeholder:"Select nice-to-have(s)…" },
+  pets:          { title:"Pets",                     path:"pets.selected",                 flat: PET_OPTIONS,               exclusive: PET_EXCLUSIVE, placeholder:"Select pet detail(s)…" },
+  thisHomeLiked: { title:"What They Liked",          path:"thisHome.liked",                flat: THIS_HOME_LIKED_OPTIONS,  placeholder:"Select what stood out…" },
+  propertyType:  { title:"Property Type",            path:"propertyType",                  flat: PROPERTY_TYPE_OPTIONS,    placeholder:"Select property type(s)…" },
+  searchDealBreakers: { title:"Deal Breakers",       path:"searchDealBreakers.selected",    flat: SEARCH_DEALBREAKER_OPTIONS, placeholder:"Select deal breaker(s)…" }
 };
 function multiSelectFieldHtml(key, selectedArr){
   selectedArr = selectedArr || [];
@@ -2590,6 +2845,18 @@ function sheetMultiSelectPicker(v, key){
   });
 }
 
+/* 1–5 star tap control (This Home > Overall Rating). Reuses the generic [data-single]
+   click handler — tapping the currently-set star clears the rating back to 0. */
+function starRatingHtml(rating){
+  rating = parseInt(rating,10) || 0;
+  var out = '<div class="star-row">';
+  for(var i=1;i<=5;i++){
+    out += '<button type="button" class="star-btn'+(i<=rating?" filled":"")+'" data-single="thisHome.rating" data-val="'+i+'" aria-label="'+i+' star'+(i>1?"s":"")+'">'+(i<=rating?"★":"☆")+'</button>';
+  }
+  out += '</div>';
+  return out;
+}
+
 function screenVisitorDetail(){
   var v = findVisitor(route.params.id);
   if(!v) return screenWorkspace();
@@ -2642,29 +2909,73 @@ function screenVisitorDetail(){
       ftF = fieldCfg("visitorDetailSimple","financingType"), paF = fieldCfg("visitorDetailSimple","preApproval"),
       naF = fieldCfg("visitorDetailSimple","followUpNextAction"), fdF = fieldCfg("visitorDetailSimple","followUpDate"),
       atF = fieldCfg("visitorDetailSimple","followUpAssignedTo"), fsF = fieldCfg("visitorDetailSimple","followUpStatus"),
-      csF = fieldCfg("visitorDetailSimple","connectionSummary");
+      csF = fieldCfg("visitorDetailSimple","connectionSummary"),
+      ltF = fieldCfg("visitorDetailSimple","leadTemperature"), pcF = fieldCfg("visitorDetailSimple","preferredContactMethod"),
+      ilF = fieldCfg("visitorDetailSimple","interestLevel"), wcF = fieldCfg("visitorDetailSimple","wouldConsiderOffer"),
+      prF = fieldCfg("visitorDetailSimple","priceReaction"), fitF = fieldCfg("visitorDetailSimple","fit"),
+      chsF = fieldCfg("visitorDetailSimple","currentHousing"), ptF = fieldCfg("visitorDetailSimple","propertyType"),
+      stF = fieldCfg("visitorDetailSimple","stories"), gpF = fieldCfg("visitorDetailSimple","garageParking");
+
+  var subHead = function(text){ return '<div class="subsection-head"><h4>'+esc(text)+'</h4></div>'; };
 
   var vBlocks = {
-    motivation: '<div class="section-head"><h3>'+esc(vdc.sectionMotivation)+'</h3></div>' +
-      '<div class="card">' +
-        multiSelectFieldHtml("motivation", d.motivation.selected) +
-        optionalDetailHtml("motivation.note", d.motivation.note, cfg("signin.otherPlaceholder"), "Other Motivation") +
-      '</div>',
-
-    preferences: '<div class="section-head"><h3>'+esc(vdc.sectionPreferences)+'</h3></div>' +
-      '<div class="card">' +
-        '<div class="pref-card-head"><span class="glyph">⭐</span><h4>Must-Haves</h4></div>' +
-        multiSelectFieldHtml("mustHaves", d.mustHaves.selected) +
-        optionalDetailHtml("mustHaves.note", d.mustHaves.note, cfg("signin.otherPlaceholder"), "Other Must-Have") +
+    /* ============ THIS HOME — fast-tap feedback on the property being hosted today ============ */
+    thisHome: '<div class="section-head"><h3>'+esc(vdc.sectionThisHome)+'</h3></div>' +
+      '<div class="card section-card-thishome">' +
+        '<div class="th-field"><label>Overall Rating</label>'+starRatingHtml(d.thisHome.rating)+'</div>' +
+        (ilF.visible!==false ? '<div class="th-field"><label>Interest Level</label><div class="chip-group">'+chipGroupHtml(INTEREST_LEVEL_OPTIONS, "thisHome.interestLevel", d.thisHome.interestLevel)+'</div></div>' : '') +
+        (wcF.visible!==false ? '<div class="th-field" style="margin-bottom:0;"><label>Would Consider Making An Offer?</label><div class="toggle-row">'+chipGroupHtml(WOULD_CONSIDER_OFFER_OPTIONS, "thisHome.wouldConsiderOffer", d.thisHome.wouldConsiderOffer)+'</div></div>' : '') +
       '</div>' +
-      '<div class="card">' +
-        '<div class="pref-card-head"><span class="glyph">✨</span><h4>Nice-to-Haves</h4></div>' +
-        multiSelectFieldHtml("niceToHaves", d.niceToHaves.selected) +
-        optionalDetailHtml("niceToHaves.note", d.niceToHaves.note, cfg("signin.otherPlaceholder"), "Other Nice-to-Have") +
+      '<div class="card section-card-thishome">' +
+        '<div class="th-field" style="margin-bottom:0;"><label>What They Liked</label>'+multiSelectFieldHtml("thisHomeLiked", d.thisHome.liked)+'</div>' +
+        optionalDetailHtml("thisHome.likedNote", d.thisHome.likedNote, "Anything else they liked?", null) +
+      '</div>' +
+      '<div class="card section-card-thishome">' +
+        '<div class="th-field" style="margin-bottom:0;"><label>'+esc(vdc.sectionDealBreakers)+' / Concerns</label>'+multiSelectFieldHtml("dealBreakers", d.dealBreakers.selected)+'</div>' +
+        optionalDetailHtml("dealBreakers.note", d.dealBreakers.note, cfg("signin.otherPlaceholder"), null) +
+      '</div>' +
+      '<div class="card section-card-thishome">' +
+        '<div class="field-row">' +
+          (prF.visible!==false ? '<div class="field"><label>Price Reaction</label><select data-field="thisHome.priceReaction"><option value="">Select…</option>' +
+            PRICE_REACTION_OPTIONS.map(function(o){ return '<option value="'+esc(o)+'"'+(d.thisHome.priceReaction===o?" selected":"")+'>'+esc(o)+'</option>'; }).join("") +
+          '</select></div>' : '') +
+          '<div class="field" style="margin-bottom:0;"><label>Price They\'d Consider</label><input type="text" id="th-price-consider" placeholder="$" inputmode="numeric"></div>' +
+        '</div>' +
+        (fitF.visible!==false ? '<div class="th-field" style="margin-bottom:0;margin-top:16px;"><label>Overall Fit</label><div class="chip-group">'+chipGroupHtml(FIT_OPTIONS, "thisHome.fit", d.thisHome.fit)+'</div></div>' : '') +
+      '</div>' +
+      '<div class="card section-card-thishome">' +
+        optionalDetailHtml("thisHome.notes", d.thisHome.notes, "Anything else worth remembering about how they reacted to this home?", "Property Feedback Notes") +
       '</div>',
 
-    preferredAreas: '<div class="section-head"><h3>'+esc(vdc.sectionPreferredAreas)+'</h3></div>' +
-      '<div class="card">' +
+    /* ============ THEIR HOME SEARCH — personal criteria, independent of today's property ============ */
+    theirHomeSearch: '<div class="section-head"><h3>'+esc(vdc.sectionTheirHomeSearch)+'</h3></div>' +
+      '<div class="card section-card-theirsearch">' +
+        '<div class="th-field"><label>Real Estate Goal</label><div class="chip-group">'+chipGroupHtml(VISIT_PURPOSES, "visitPurpose", v.visitPurpose)+'</div></div>' +
+        '<div class="th-field" style="margin-bottom:0;"><label>Timeline</label><div class="toggle-row">'+chipGroupHtml(TIMELINES, "buyingTimeline", v.buyingTimeline)+'</div></div>' +
+      '</div>' +
+      (chsF.visible!==false ? '<div class="card section-card-theirsearch">' +
+        '<div class="th-field" style="margin-bottom:0;"><label>Current Housing</label><div class="toggle-row">'+chipGroupHtml(CURRENT_HOUSING_OPTIONS, "currentHousing", d.currentHousing)+'</div></div>' +
+      '</div>' : '') +
+
+      subHead(vdc.sectionFinancing) +
+      '<div class="card section-card-theirsearch">' +
+        (ftF.visible!==false ? '<div class="field"><label>Financing Type'+(ftF.required?' <span class="req-mark">*</span>':'')+'</label><select data-field="financing.type">' +
+          '<option value="">Select…</option>' +
+          FINANCING_TYPES.map(function(t){ return '<option value="'+esc(t)+'"'+(d.financing.type===t?" selected":"")+'>'+esc(t)+'</option>'; }).join("") +
+        '</select></div>' : '') +
+        (paF.visible!==false ? '<div class="field"><label>Financing Status'+(paF.required?' <span class="req-mark">*</span>':'')+'</label><select data-field="financing.preApproval">' +
+          '<option value="">Select…</option>' +
+          PREAPPROVAL_STATUSES.map(function(t){ return '<option value="'+esc(t)+'"'+(d.financing.preApproval===t?" selected":"")+'>'+esc(t)+'</option>'; }).join("") +
+        '</select></div>' : '') +
+        '<div class="field-row">' +
+          '<div class="field"><label>Budget Min</label><input type="text" id="fin-budget-min" placeholder="$" inputmode="numeric"></div>' +
+          '<div class="field" style="margin-bottom:0;"><label>Budget Max</label><input type="text" id="fin-budget-max" placeholder="$" inputmode="numeric"></div>' +
+        '</div>' +
+        (showLenderNotes ? optionalDetailHtml("financing.lenderNotes", d.financing.lenderNotes, "Bank, lender, broker or referral notes...", "Lender Notes") : '') +
+      '</div>' +
+
+      subHead(vdc.sectionPreferredAreas) +
+      '<div class="card section-card-theirsearch">' +
         '<div class="chip-group" id="pa-chips">' +
           (d.preferredAreas||[]).map(function(a){ return '<span class="area-chip">'+esc(a)+'<button type="button" data-area-remove="'+esc(a)+'">'+ICONS.close+'</button></span>'; }).join("") +
         '</div>' +
@@ -2672,60 +2983,93 @@ function screenVisitorDetail(){
           '<input type="text" id="pa-new" placeholder="Chula Vista, Eastlake, Rancho Bernardo…" autocomplete="off">' +
           '<button class="btn btn-secondary btn-sm" id="pa-add">Add</button>' +
         '</div>' +
-      '</div>',
+      '</div>' +
 
-    financing: '<div class="section-head"><h3>'+esc(vdc.sectionFinancing)+'</h3></div>' +
-      '<div class="card">' +
-        (ftF.visible!==false ? '<div class="field"><label>Financing Type'+(ftF.required?' <span class="req-mark">*</span>':'')+'</label><select data-field="financing.type">' +
-          '<option value="">Select…</option>' +
-          FINANCING_TYPES.map(function(t){ return '<option value="'+esc(t)+'"'+(d.financing.type===t?" selected":"")+'>'+esc(t)+'</option>'; }).join("") +
-        '</select></div>' : '') +
-        (paF.visible!==false ? '<div class="field" style="margin-bottom:0;"><label>Pre-Approval Status'+(paF.required?' <span class="req-mark">*</span>':'')+'</label><select data-field="financing.preApproval">' +
-          '<option value="">Select…</option>' +
-          PREAPPROVAL_STATUSES.map(function(t){ return '<option value="'+esc(t)+'"'+(d.financing.preApproval===t?" selected":"")+'>'+esc(t)+'</option>'; }).join("") +
-        '</select></div>' : '') +
-        (showLenderNotes ? optionalDetailHtml("financing.lenderNotes", d.financing.lenderNotes, "Bank, lender, broker or referral notes...", "Lender Notes") : '') +
-      '</div>',
+      '<div class="card section-card-theirsearch">' +
+        (ptF.visible!==false ? '<div class="th-field"><label>Property Type</label>'+multiSelectFieldHtml("propertyType", d.propertyType)+'</div>' : '') +
+        (stF.visible!==false ? '<div class="th-field"><label>Stories</label><div class="chip-group">'+chipGroupHtml(STORIES_OPTIONS, "stories", d.stories)+'</div></div>' : '') +
+        '<div class="single-story-row"><input type="checkbox" id="single-story-required" '+(d.singleStoryRequired?"checked":"")+'><label for="single-story-required">Single Story Required (hard requirement)</label></div>' +
+      '</div>' +
 
-    family: '<div class="section-head"><h3>'+esc(vdc.sectionFamily)+'</h3></div>' +
-      '<div class="card">' +
+      '<div class="card section-card-theirsearch">' +
+        '<div class="field-row">' +
+          '<div class="field"><label>Desired Beds</label><select data-field="desiredBeds"><option value="">Select…</option>' +
+            BEDS_OPTIONS.map(function(b){ return '<option value="'+b+'"'+(d.desiredBeds===b?" selected":"")+'>'+b+'</option>'; }).join("") +
+          '</select></div>' +
+          '<div class="field" style="margin-bottom:0;"><label>Desired Baths</label><select data-field="desiredBaths"><option value="">Select…</option>' +
+            BATHS_OPTIONS.map(function(b){ return '<option value="'+b+'"'+(d.desiredBaths===b?" selected":"")+'>'+b+'</option>'; }).join("") +
+          '</select></div>' +
+        '</div>' +
+        (gpF.visible!==false ? '<div class="th-field" style="margin-bottom:0;margin-top:16px;"><label>Garage / Parking</label><div class="chip-group">'+chipGroupHtml(GARAGE_PARKING_OPTIONS, "garageParking", d.garageParking)+'</div></div>' : '') +
+      '</div>' +
+
+      subHead(vdc.sectionPreferences) +
+      '<div class="card section-card-theirsearch">' +
+        '<div class="pref-card-head"><span class="glyph">⭐</span><h4>Must-Haves</h4></div>' +
+        multiSelectFieldHtml("mustHaves", d.mustHaves.selected) +
+        optionalDetailHtml("mustHaves.note", d.mustHaves.note, cfg("signin.otherPlaceholder"), "Other Must-Have") +
+      '</div>' +
+      '<div class="card section-card-theirsearch">' +
+        '<div class="pref-card-head"><span class="glyph">✨</span><h4>Nice-to-Haves</h4></div>' +
+        multiSelectFieldHtml("niceToHaves", d.niceToHaves.selected) +
+        optionalDetailHtml("niceToHaves.note", d.niceToHaves.note, cfg("signin.otherPlaceholder"), "Other Nice-to-Have") +
+      '</div>' +
+
+      subHead(vdc.sectionSearchDealBreakers) +
+      '<div class="card section-card-theirsearch">' +
+        multiSelectFieldHtml("searchDealBreakers", d.searchDealBreakers.selected) +
+        optionalDetailHtml("searchDealBreakers.note", d.searchDealBreakers.note, cfg("signin.otherPlaceholder"), null) +
+      '</div>' +
+
+      subHead(vdc.sectionMotivation) +
+      '<div class="card section-card-theirsearch">' +
+        multiSelectFieldHtml("motivation", d.motivation.selected) +
+        optionalDetailHtml("motivation.note", d.motivation.note, cfg("signin.otherPlaceholder"), "Other Motivation") +
+      '</div>' +
+
+      subHead(vdc.sectionFamily) +
+      '<div class="card section-card-theirsearch">' +
         (hsF.visible!==false ? '<div class="field"><label>Household Size'+(hsF.required?' <span class="req-mark">*</span>':'')+'</label><select data-field="family.householdSize">' +
           '<option value="">Select…</option>' +
           HOUSEHOLD_SIZES.map(function(h){ return '<option value="'+h+'"'+(d.family.householdSize===h?" selected":"")+'>'+h+'</option>'; }).join("") +
         '</select></div>' : '') +
         (chF.visible!==false ? '<div class="field" style="margin-bottom:0;"><label>Children'+(chF.required?' <span class="req-mark">*</span>':'')+'</label><div class="toggle-row">'+chipGroupHtml(CHILDREN_STATUSES, "family.children", d.family.children)+'</div></div>' : '') +
         optionalDetailHtml("family.note", d.family.note, cfg("signin.otherPlaceholder"), "Other Family Detail(s)") +
-      '</div>',
+      '</div>' +
 
-    pets: '<div class="section-head"><h3>'+esc(vdc.sectionPets)+'</h3></div>' +
-      '<div class="card">' +
+      subHead(vdc.sectionPets) +
+      '<div class="card section-card-theirsearch">' +
         multiSelectFieldHtml("pets", d.pets.selected) +
         optionalDetailHtml("pets.note", d.pets.note, cfg("signin.otherPlaceholder"), "Other Pet Detail(s)") +
+      '</div>' +
+
+      subHead(vdc.sectionConnectionSummary) +
+      '<div class="card section-card-theirsearch">' +
+        optionalDetailHtml("connectionSummary", d.connectionSummary, "What should I remember about their search?") +
       '</div>',
 
-    dealBreakers: '<div class="section-head"><h3>'+esc(vdc.sectionDealBreakers)+'</h3></div>' +
-      '<div class="card">' +
-        multiSelectFieldHtml("dealBreakers", d.dealBreakers.selected) +
-        optionalDetailHtml("dealBreakers.note", d.dealBreakers.note, cfg("signin.otherPlaceholder"), "Other Deal Breaker(s)") +
-      '</div>',
-
+    /* ============ FOLLOW-UP — compact action panel, not a third big section ============ */
     followUp: '<div class="section-head"><h3>'+esc(vdc.sectionFollowUp)+'</h3></div>' +
       '<div class="card">' +
+        (ltF.visible!==false ? '<div class="field"><label>Lead Temperature</label><div class="toggle-row">'+chipGroupHtml(LEAD_TEMPERATURE_OPTIONS, "followUp.leadTemperature", d.followUp.leadTemperature)+'</div></div>' : '') +
         (naF.visible!==false ? '<div class="field"><label>Next Action'+(naF.required!==false?' <span class="req-mark">*</span>':'')+'</label><select data-field="followUp.nextAction">' +
           '<option value="">Select…</option>' +
           NEXT_ACTIONS.map(function(a){ return '<option value="'+esc(a)+'"'+(d.followUp.nextAction===a?" selected":"")+'>'+esc(a)+'</option>'; }).join("") +
         '</select></div>' : '') +
-        (fdF.visible!==false ? '<div class="field"><label>Follow-Up Date'+(fdF.required?' <span class="req-mark">*</span>':'')+'</label><input type="date" data-field="followUp.date" value="'+esc(d.followUp.date)+'"></div>' : '') +
+        '<div class="field-row">' +
+          (fdF.visible!==false ? '<div class="field"><label>Follow-Up Date'+(fdF.required?' <span class="req-mark">*</span>':'')+'</label><input type="date" data-field="followUp.date" value="'+esc(d.followUp.date)+'"></div>' : '') +
+          (pcF.visible!==false ? '<div class="field" style="margin-bottom:0;"><label>Preferred Contact</label><select data-field="followUp.preferredContactMethod"><option value="">Select…</option>' +
+            PREFERRED_CONTACT_METHOD_OPTIONS.map(function(m){ return '<option value="'+esc(m)+'"'+(d.followUp.preferredContactMethod===m?" selected":"")+'>'+esc(m)+'</option>'; }).join("") +
+          '</select></div>' : '') +
+        '</div>' +
         (atF.visible!==false ? '<div class="field"><label>Assigned To'+(atF.required?' <span class="req-mark">*</span>':'')+'</label><select data-field="followUp.assignedTo">' +
           '<option value="">Select…</option>' +
           ASSIGNEES.map(function(a){ return '<option value="'+esc(a)+'"'+(d.followUp.assignedTo===a?" selected":"")+'>'+esc(a)+'</option>'; }).join("") +
         '</select></div>' : '') +
         (fsF.visible!==false ? '<div class="field" style="margin-bottom:0;"><label>Follow-Up Status'+(fsF.required?' <span class="req-mark">*</span>':'')+'</label><div class="toggle-row">'+chipGroupHtml(FOLLOWUP_STATUSES, "followUp.status", d.followUp.status)+'</div></div>' : '') +
+        (csF.visible!==false ? optionalDetailHtml("followUp.promise", d.followUp.promise, "What did you promise to follow up on?", "Follow-Up Notes") : '') +
         '<div id="followup-done-wrap" style="margin-top:14px;" class="'+(showFollowUpDone?"":"hidden")+'"><button class="btn-followup-done'+(d.followUp.status==="Completed"?" done":"")+'" data-action="toggleFollowUp">'+ICONS.check+'<span>'+(d.followUp.status==="Completed"?esc(vdc.markFollowUpUndoButton):esc(vdc.markFollowUpDoneButton))+'</span></button></div>' +
       '</div>',
-
-    connectionSummary: csF.visible!==false ? '<div class="section-head"><h3>'+esc(vdc.sectionConnectionSummary)+'</h3></div>' +
-      '<div class="card">' + optionalDetailHtml("connectionSummary", d.connectionSummary, "What should I remember about this connection?") + '</div>' : '',
 
     tasks: '<div class="section-head"><h3>'+esc(vdc.sectionTasks)+'</h3></div>' +
       '<div class="card">' +
@@ -2767,6 +3111,206 @@ function sheetEditContactType(v){
 }
 
 /* ============================================================
+   OPEN HOUSE ANALYTICS + SELLER REPORT
+   A "Group" is one sign-in record; "Visitors" sums partySize across every group in the
+   open house (a couple + child who all sign in together is 1 Group / 3 Visitors). Every
+   aggregate below is built only from This Home feedback fields — never names, contact
+   info, personal search notes, financing, or follow-up data — so the exact same numbers
+   can safely feed both the internal Analytics view and the seller-facing report.
+   ============================================================ */
+function partySizeCount(v){
+  var n = parseInt(String(v.partySize||"1").replace(/[^0-9]/g,""),10);
+  return (!n || isNaN(n)) ? 1 : n;
+}
+function openHouseGroupsAndVisitors(list){
+  return {
+    groups: list.length,
+    visitors: list.reduce(function(sum,v){ return sum + partySizeCount(v); }, 0)
+  };
+}
+function tallyOptions(list, getter){
+  var counts = {};
+  list.forEach(function(v){
+    var val = getter(v);
+    if(val==null || val==="") return;
+    if(Array.isArray(val)){ val.forEach(function(x){ if(x) counts[x] = (counts[x]||0)+1; }); }
+    else{ counts[val] = (counts[val]||0)+1; }
+  });
+  return Object.keys(counts).map(function(k){ return { label:k, count:counts[k] }; }).sort(function(a,b){ return b.count-a.count; });
+}
+function averageRating(list){
+  var rated = list.filter(function(v){ return parseInt(v.detail.thisHome.rating,10)>0; });
+  if(!rated.length) return 0;
+  var sum = rated.reduce(function(s,v){ return s+parseInt(v.detail.thisHome.rating,10); }, 0);
+  return Math.round((sum/rated.length)*10)/10;
+}
+function openHouseThisHomeStats(oh){
+  var list = visitorsFor(oh.id);
+  var gv = openHouseGroupsAndVisitors(list);
+  return {
+    list: list,
+    groups: gv.groups,
+    visitors: gv.visitors,
+    avgRating: averageRating(list),
+    interestLevel: tallyOptions(list, function(v){ return v.detail.thisHome.interestLevel; }),
+    wouldConsiderOffer: tallyOptions(list, function(v){ return v.detail.thisHome.wouldConsiderOffer; }),
+    liked: tallyOptions(list, function(v){ return v.detail.thisHome.liked; }),
+    concerns: tallyOptions(list, function(v){ return v.detail.dealBreakers.selected; }),
+    priceReaction: tallyOptions(list, function(v){ return v.detail.thisHome.priceReaction; }),
+    fit: tallyOptions(list, function(v){ return v.detail.thisHome.fit; })
+  };
+}
+/* Internal-only — surfaces names, so this is never used on the Seller Report. */
+function leadOpportunities(list){
+  return list.filter(function(v){
+    var th = v.detail.thisHome;
+    return th.wouldConsiderOffer==="Yes" || th.interestLevel==="Very Interested" || v.detail.followUp.leadTemperature==="Hot";
+  }).sort(function(a,b){ return (parseInt(b.detail.thisHome.rating,10)||0) - (parseInt(a.detail.thisHome.rating,10)||0); });
+}
+function distributionBarsHtml(items){
+  if(!items.length) return '<div style="color:var(--ink-faint);font-size:13.5px;">No responses yet</div>';
+  var max = Math.max.apply(null, items.map(function(i){ return i.count; }));
+  return items.map(function(i){
+    var widthPct = max ? Math.round((i.count/max)*100) : 0;
+    return '<div class="dist-row">' +
+      '<div class="dist-row-top"><span class="dist-label">'+esc(i.label)+'</span><span class="dist-count">'+i.count+'</span></div>' +
+      '<div class="dist-bar-track"><div class="dist-bar-fill" style="width:'+widthPct+'%;"></div></div>' +
+    '</div>';
+  }).join("");
+}
+/* Auto-generated, strictly from counted data — never invented or estimated. */
+function buildWhatWeHeardSummary(stats){
+  if(!stats.list.length) return "No feedback was captured for this open house yet.";
+  var lines = [];
+  lines.push(stats.groups+" group"+(stats.groups===1?"":"s")+" ("+stats.visitors+" visitor"+(stats.visitors===1?"":"s")+") toured the home.");
+  if(stats.avgRating) lines.push("Average overall rating was "+stats.avgRating+" out of 5.");
+  if(stats.liked.length){
+    var topLiked = stats.liked.slice(0,3).map(function(i){ return i.label.toLowerCase(); });
+    lines.push("The "+topLiked.join(", ")+" stood out most to visitors.");
+  }
+  if(stats.concerns.length){
+    lines.push("The most frequently mentioned concern was "+stats.concerns[0].label.toLowerCase()+" ("+stats.concerns[0].count+" group"+(stats.concerns[0].count===1?"":"s")+").");
+  }
+  if(stats.priceReaction.length){
+    lines.push("On price, the most common reaction was that the home \""+stats.priceReaction[0].label+"\" ("+stats.priceReaction[0].count+" group"+(stats.priceReaction[0].count===1?"":"s")+").");
+  }
+  var yesEntry = stats.wouldConsiderOffer.find(function(i){ return i.label==="Yes"; });
+  if(yesEntry && yesEntry.count) lines.push(yesEntry.count+" group"+(yesEntry.count===1?"":"s")+" indicated they would consider making an offer.");
+  return lines.join(" ");
+}
+function buildSellerReportPlainText(oh, stats, whatWeHeard){
+  var lines = ["OPEN HOUSE SELLER REPORT — "+cfg("brand.companyName"), propertyOneLine(oh), formatDateLong(oh.date), ""];
+  lines.push(stats.groups+" Groups / "+stats.visitors+" Visitors", "Average Rating: "+(stats.avgRating||"N/A")+"/5", "");
+  lines.push("WHAT WE HEARD", whatWeHeard, "");
+  function section(title, items){
+    if(!items.length) return;
+    lines.push(title.toUpperCase());
+    items.forEach(function(i){ lines.push("- "+i.label+" ("+i.count+")"); });
+    lines.push("");
+  }
+  section("What Buyers Liked", stats.liked);
+  section("Concerns Raised", stats.concerns);
+  section("Price Reaction", stats.priceReaction);
+  section("Overall Fit", stats.fit);
+  return lines.join("\n");
+}
+
+function findOpenHouseForRoute(){
+  return state.openHouses.find(function(o){ return o.id===route.params.id; }) || activeOpenHouse();
+}
+
+function screenOpenHouseAnalytics(){
+  var oh = findOpenHouseForRoute();
+  if(!oh) return screenWelcome();
+  var stats = openHouseThisHomeStats(oh);
+  var ac = cfg("pages.analytics");
+  var opportunities = leadOpportunities(stats.list);
+
+  var body;
+  if(!stats.list.length){
+    body = '<div class="empty-state"><div class="glyph">'+ICONS.sparkle+'</div><h3>'+esc(ac.emptyTitle)+'</h3><p>'+esc(ac.emptyBody)+'</p></div>';
+  }else{
+    body =
+      '<div class="stat-grid">' +
+        '<div class="stat-tile"><div class="num">'+stats.groups+'</div><div class="lbl">'+esc(ac.groupsLabel)+'</div></div>' +
+        '<div class="stat-tile"><div class="num">'+stats.visitors+'</div><div class="lbl">'+esc(ac.visitorsLabel)+'</div></div>' +
+        '<div class="stat-tile"><div class="num">'+(stats.avgRating||"—")+'</div><div class="lbl">'+esc(ac.avgRatingLabel)+'</div></div>' +
+      '</div>' +
+      '<div class="section-head"><h3>Interest Level</h3></div><div class="card">'+distributionBarsHtml(stats.interestLevel)+'</div>' +
+      '<div class="section-head"><h3>Would Consider An Offer</h3></div><div class="card">'+distributionBarsHtml(stats.wouldConsiderOffer)+'</div>' +
+      '<div class="section-head"><h3>What They Liked</h3></div><div class="card">'+distributionBarsHtml(stats.liked)+'</div>' +
+      '<div class="section-head"><h3>Concerns</h3></div><div class="card">'+distributionBarsHtml(stats.concerns)+'</div>' +
+      '<div class="section-head"><h3>Price Reaction</h3></div><div class="card">'+distributionBarsHtml(stats.priceReaction)+'</div>' +
+      '<div class="section-head"><h3>Overall Fit</h3></div><div class="card">'+distributionBarsHtml(stats.fit)+'</div>' +
+      '<div class="priority-card">' +
+        '<div class="pc-tag">Internal Only</div>' +
+        '<h3>Lead Opportunities ('+opportunities.length+')</h3>' +
+        (opportunities.length ? opportunities.slice(0,8).map(function(v){
+          return '<p style="margin-top:10px;font-size:13.5px;"><b style="color:#fff;">'+esc(v.name||"Unnamed Visitor")+'</b> — '+esc([v.detail.thisHome.interestLevel, v.detail.thisHome.wouldConsiderOffer?("Offer: "+v.detail.thisHome.wouldConsiderOffer):"", v.detail.followUp.leadTemperature?("Temp: "+v.detail.followUp.leadTemperature):""].filter(Boolean).join(" · "))+'</p>';
+        }).join("") : '<p style="margin-top:6px;">None flagged yet.</p>') +
+        '<p style="margin-top:14px;font-size:11.5px;">'+esc(ac.internalHeading)+'</p>' +
+      '</div>' +
+      '<div style="margin-top:20px;">' +
+        '<button class="btn btn-secondary" data-nav="sellerReport" data-id="'+oh.id+'">'+esc(ac.sellerReportButton)+'</button>' +
+      '</div>';
+  }
+
+  return '<div class="screen">' + topbar(ac.title, {backTo:"workspace"}) +
+    '<div class="content">' +
+      '<div class="kicker-row"><span class="pulse-dot"></span>'+esc(propertyTitle(oh))+'</div>' +
+      body +
+    '</div></div>';
+}
+
+function screenSellerReport(){
+  var oh = findOpenHouseForRoute();
+  if(!oh) return screenWelcome();
+  var stats = openHouseThisHomeStats(oh);
+  var sr = cfg("pages.sellerReport");
+  var whatWeHeard = buildWhatWeHeardSummary(stats);
+
+  var body = !stats.list.length ?
+    '<div class="empty-state"><div class="glyph">'+ICONS.sparkle+'</div><h3>No feedback yet</h3><p>Check back after the open house has visitors.</p></div>' :
+    '<div class="stat-grid">' +
+      '<div class="stat-tile"><div class="num">'+stats.groups+'</div><div class="lbl">Groups</div></div>' +
+      '<div class="stat-tile"><div class="num">'+stats.visitors+'</div><div class="lbl">Visitors</div></div>' +
+      '<div class="stat-tile"><div class="num">'+(stats.avgRating||"—")+'</div><div class="lbl">Avg. Rating</div></div>' +
+    '</div>' +
+    '<div class="section-head"><h3>'+esc(sr.whatWeHeardHeading)+'</h3></div>' +
+    '<div class="card"><p style="font-size:15px;line-height:1.6;">'+esc(whatWeHeard)+'</p></div>' +
+    '<div class="section-head"><h3>What Buyers Liked</h3></div><div class="card">'+distributionBarsHtml(stats.liked)+'</div>' +
+    '<div class="section-head"><h3>Concerns Raised</h3></div><div class="card">'+distributionBarsHtml(stats.concerns)+'</div>' +
+    '<div class="section-head"><h3>Price Reaction</h3></div><div class="card">'+distributionBarsHtml(stats.priceReaction)+'</div>' +
+    '<div class="section-head"><h3>Overall Fit</h3></div><div class="card">'+distributionBarsHtml(stats.fit)+'</div>' +
+    '<div style="margin-top:20px;"><button class="btn btn-primary" id="btn-copy-seller-report">'+esc(sr.copyButton)+'</button></div>';
+
+  return '<div class="screen">' + topbar(sr.title, {backTo:"workspace"}) +
+    '<div class="content">' +
+      '<div class="kicker-row">'+esc(propertyOneLine(oh))+'</div>' +
+      '<p style="color:var(--ink-soft);font-size:14px;margin:8px 0 18px;">'+esc(sr.subtitle)+'</p>' +
+      body +
+    '</div></div>';
+}
+
+function mountSellerReport(){
+  var oh = findOpenHouseForRoute();
+  if(!oh) return;
+  var stats = openHouseThisHomeStats(oh);
+  var whatWeHeard = buildWhatWeHeardSummary(stats);
+  var plainText = buildSellerReportPlainText(oh, stats, whatWeHeard);
+  var btn = document.getElementById("btn-copy-seller-report");
+  if(btn){
+    btn.addEventListener("click", function(){
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(plainText).then(function(){ toast("Report copied"); }).catch(function(){ fallbackCopy(plainText); });
+      }else{
+        fallbackCopy(plainText);
+      }
+    });
+  }
+}
+
+/* ============================================================
    SCREEN: WRAP-UP
    ============================================================ */
 function screenWrapup(){
@@ -2797,6 +3341,7 @@ function screenWrapup(){
       '<div style="margin-top:26px;display:flex;flex-direction:column;gap:12px;">' +
         '<button class="btn btn-secondary" data-nav="queue">'+esc(wu.reviewButton)+'</button>' +
         '<button class="btn btn-secondary" data-nav="queue" data-filter="follow-up">'+esc(wu.followUpButton)+'</button>' +
+        '<button class="btn btn-secondary" data-nav="analytics" data-id="'+oh.id+'">'+esc(cfg("pages.analytics.title"))+'</button>' +
         '<button class="btn btn-secondary" data-nav="snapshots">'+esc(wu.snapshotsButton)+'</button>' +
         '<button class="btn btn-primary" data-action="finishDay">'+esc(wu.finishButton)+'</button>' +
       '</div>' +
@@ -3325,7 +3870,8 @@ function keyedOptionCard(title, listKey){
   '</div>';
 }
 
-var SIMPLE_OPTION_LISTS = ["motivations","petOptions","dealBreakerOptions","financingTypes","preApprovalStatuses","nextActions","followUpStatuses","householdSizes","childrenStatuses","reasonsForVisit","preferredAreaSeed"];
+var SIMPLE_OPTION_LISTS = ["motivations","petOptions","dealBreakerOptions","financingTypes","preApprovalStatuses","nextActions","followUpStatuses","householdSizes","childrenStatuses","reasonsForVisit","preferredAreaSeed",
+  "thisHomeLikedOptions","interestLevelOptions","wouldConsiderOfferOptions","priceReactionOptions","fitOptions","currentHousingOptions","propertyTypeOptions","storiesOptions","garageParkingOptions","mustHaveOptions","searchDealBreakerOptions","leadTemperatureOptions","preferredContactMethodOptions"];
 var KEYED_OPTION_LISTS = ["contactTypes","visitPurposes","timelines","representations"];
 
 /* ---- Hub-and-spoke dispatcher: route.params.section picks the sub-screen ---- */
@@ -3438,6 +3984,19 @@ function screenSettingsOptions(){
     simpleOptionCard("Children Status Options", "childrenStatuses") +
     simpleOptionCard("Reason for Visit Options", "reasonsForVisit") +
     simpleOptionCard("Preferred Areas (Suggestions)", "preferredAreaSeed") +
+    simpleOptionCard("This Home — Liked Options", "thisHomeLikedOptions") +
+    simpleOptionCard("This Home — Interest Level Options", "interestLevelOptions") +
+    simpleOptionCard("This Home — Would Consider Offer Options", "wouldConsiderOfferOptions") +
+    simpleOptionCard("This Home — Price Reaction Options", "priceReactionOptions") +
+    simpleOptionCard("This Home — Overall Fit Options", "fitOptions") +
+    simpleOptionCard("Their Home Search — Current Housing Options", "currentHousingOptions") +
+    simpleOptionCard("Their Home Search — Property Type Options", "propertyTypeOptions") +
+    simpleOptionCard("Their Home Search — Stories Options", "storiesOptions") +
+    simpleOptionCard("Their Home Search — Garage/Parking Options", "garageParkingOptions") +
+    simpleOptionCard("Their Home Search — Must-Have Options", "mustHaveOptions") +
+    simpleOptionCard("Their Home Search — Deal Breaker Options", "searchDealBreakerOptions") +
+    simpleOptionCard("Lead Temperature Options", "leadTemperatureOptions") +
+    simpleOptionCard("Preferred Contact Method Options", "preferredContactMethodOptions") +
     keyedOptionCard("Contact Type", "contactTypes") +
     keyedOptionCard("Visit Purpose", "visitPurposes") +
     keyedOptionCard("Timeline", "timelines") +
@@ -3781,6 +4340,7 @@ function mountRoute(){
 
   if(route.name==="visitorDetail"){ mountVisitorDetail(); }
   if(route.name==="snapshotDetail"){ mountSnapshotDetail(); }
+  if(route.name==="sellerReport"){ mountSellerReport(); }
   if(route.name==="signin" && (route.params.phase||"form")==="form"){ mountSignIn(); }
   if(route.name==="settings"){ mountSettings(); }
 }
@@ -3901,9 +4461,17 @@ function openArchivedSummary(oh){
         '<div class="stat-tile"><div class="num">'+promises.length+'</div><div class="lbl">Follow-Ups</div></div>' +
       '</div>' +
     '</div>' +
-    '<div class="sheet-footer"><button class="btn btn-secondary" id="btn-reactivate">Reopen as Active</button></div>';
+    '<div class="sheet-footer">' +
+      '<div class="btn-row" style="margin-bottom:10px;">' +
+        '<button class="btn btn-secondary btn-sm" id="btn-arch-analytics">Analytics</button>' +
+        '<button class="btn btn-secondary btn-sm" id="btn-arch-seller">Seller Report</button>' +
+      '</div>' +
+      '<button class="btn btn-secondary" id="btn-reactivate">Reopen as Active</button>' +
+    '</div>';
   openSheet(body, function(sheet, close){
     sheet.querySelector("[data-sheet-close]").addEventListener("click", close);
+    sheet.querySelector("#btn-arch-analytics").addEventListener("click", function(){ close(); nav("analytics", { id: oh.id }); });
+    sheet.querySelector("#btn-arch-seller").addEventListener("click", function(){ close(); nav("sellerReport", { id: oh.id }); });
     sheet.querySelector("#btn-reactivate").addEventListener("click", function(){
       var current = activeOpenHouse();
       if(current) current.status = "archived";
@@ -3925,12 +4493,15 @@ function mountVisitorDetail(){
   var focusPrefNotePath = null;
   initAutosizeTextareas(container);
 
-  /* text / textarea / select bindings — no full rerender (preserves focus + cursor) */
+  /* text / textarea / select bindings — no full rerender (preserves focus + cursor).
+     "name" and "email" live on the visitor record itself (v), not on v.detail (d) — every
+     other data-field path is a nested detail path, so those two are special-cased. */
   Array.prototype.forEach.call(container.querySelectorAll("[data-field]"), function(el){
     var key = el.getAttribute("data-field");
     var evt = (el.tagName==="TEXTAREA" || el.tagName==="INPUT") ? "input" : "change";
     el.addEventListener(evt, function(){
-      setPath(d, key, el.value); saveState(); flashAutosave();
+      if(key==="name" || key==="email"){ v[key] = el.value; } else { setPath(d, key, el.value); }
+      saveState(); flashAutosave();
       if(key==="followUp.promise" || key==="followUp.nextAction"){
         var wrap = document.getElementById("followup-done-wrap");
         if(wrap) wrap.classList.toggle("hidden", !hasFollowUpCommitment(d));
@@ -3948,6 +4519,35 @@ function mountVisitorDetail(){
   var phoneEl = container.querySelector("[data-phone-field]");
   if(phoneEl){
     bindPhoneInput(phoneEl, function(val){ v.phone = val; saveState(); flashAutosave(); });
+  }
+
+  /* Currency-style inputs (This Home > Price They'd Consider, Financing > Budget Min/Max) —
+     live-formatted like every other price field in the app, saved on blur-safe "input". */
+  (function(){
+    var priceEl = container.querySelector("#th-price-consider");
+    if(priceEl){
+      bindCurrencyInput(priceEl, d.thisHome.priceConsider);
+      priceEl.addEventListener("input", function(){ d.thisHome.priceConsider = currencyValue(priceEl); saveState(); flashAutosave(); });
+    }
+    var minEl = container.querySelector("#fin-budget-min");
+    if(minEl){
+      bindCurrencyInput(minEl, d.financing.budgetMin);
+      minEl.addEventListener("input", function(){ d.financing.budgetMin = currencyValue(minEl); saveState(); flashAutosave(); });
+    }
+    var maxEl = container.querySelector("#fin-budget-max");
+    if(maxEl){
+      bindCurrencyInput(maxEl, d.financing.budgetMax);
+      maxEl.addEventListener("input", function(){ d.financing.budgetMax = currencyValue(maxEl); saveState(); flashAutosave(); });
+    }
+  })();
+
+  /* Single Story Required — independent hard-requirement toggle, distinct from picking
+     "Single Story" under Stories (a preference, not a dealbreaker). */
+  var singleStoryEl = container.querySelector("#single-story-required");
+  if(singleStoryEl){
+    singleStoryEl.addEventListener("change", function(){
+      d.singleStoryRequired = singleStoryEl.checked; saveState(); flashAutosave();
+    });
   }
 
   /* Preferred Areas — tag input with chips + remove + offline autocomplete */
@@ -4018,8 +4618,11 @@ function mountVisitorDetail(){
     if(single){
       var path = single.getAttribute("data-single");
       var sval = single.getAttribute("data-val");
-      var cur2 = getPath(d, path);
-      setPath(d, path, cur2===sval ? "" : sval);
+      /* "Real Estate Goal" and "Timeline" (Their Home Search) reuse visitPurpose/buyingTimeline,
+         which live on the visitor record itself, not under detail. */
+      var targetObj = (path==="visitPurpose" || path==="buyingTimeline") ? v : d;
+      var cur2 = getPath(targetObj, path);
+      setPath(targetObj, path, cur2===sval ? "" : sval);
       saveState(); flashAutosave();
       appEl.removeEventListener("click", globalClickHandler);
       render();
