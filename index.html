@@ -276,8 +276,43 @@ input,textarea,select{ font-family: inherit; }
 .ms-field-body{ flex:1; min-width:0; }
 .ms-field-chev{ color: var(--ink-faint); flex:none; display:flex; transform: rotate(90deg); }
 .ms-placeholder{ color: var(--ink-faint); font-size:15.5px; }
+.ms-summary-text{ color: var(--ink); font-size:15px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
 .ms-chips{ display:flex; flex-wrap:wrap; gap:6px; }
 .ms-chip{ background: var(--ink); color:#fff; font-size:12.5px; font-weight:600; padding:5px 11px; border-radius: var(--r-pill); }
+
+/* ---------- Category → Specific Feedback picker (What They Liked / Concerns) ----------
+   Tighter, evenly-weighted controls than the standard .chip so a full category never reads
+   as a "wall of pills" — smaller font, tighter padding, consistent tap target. */
+.chip-compact{ padding:8px 13px; font-size:13px; }
+.cat-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+.cat-tile{
+  flex:1 1 calc(50% - 8px); min-width:130px; display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:13px 15px; border-radius:14px; background: var(--mist); border:1px solid var(--line);
+  font-size:14px; font-weight:600; color: var(--ink); text-align:left;
+  transition: all .15s var(--ease-spring);
+}
+.cat-tile:active{ transform: scale(.96); background: var(--mist-deep); }
+.cat-tile-label{ min-width:0; }
+.cat-tile-count{ flex:none; background: var(--ink); color:#fff; font-size:11px; font-weight:700; padding:2px 7px; border-radius: var(--r-pill); }
+.cat-tile-other{ color: var(--ink-soft); }
+.cat-back{
+  display:flex; align-items:center; gap:2px; background:none; border:none; padding:2px 0 14px;
+  font-size:13.5px; font-weight:600; color: var(--ink-soft);
+}
+.cat-back:active{ opacity:.6; }
+.cat-active-label{ font-family:var(--serif); font-size:17px; font-weight:700; color: var(--ink); margin-bottom:14px; }
+.cat-options{ row-gap:8px; }
+.ms-selected-summary{ margin-top:20px; padding-top:16px; border-top:1px solid var(--line-soft); }
+.ms-selected-count{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; color: var(--ink-faint); margin-bottom:5px; }
+.ms-selected-preview{ font-size:13.5px; color: var(--ink-soft); line-height:1.4; }
+
+/* "+ Add Custom" chip-entry (Motivation, Must-Haves, Nice-to-Haves, Deal Breakers) */
+.custom-add-row{ display:flex; gap:8px; }
+.ms-custom-input{
+  flex:1; min-width:0; border:1px solid var(--line); background: var(--mist); border-radius: var(--r-sm);
+  padding:12px 14px; font-size:15px; color: var(--ink); font-family:inherit;
+}
+.ms-custom-input:focus{ outline:none; border-color: var(--ink); background: var(--paper); }
 
 /* ---------- This Home / Their Home Search (Visitor Profile v2) ----------
    Distinct-but-subtle visual identity: This Home cards carry a thin gold accent
@@ -396,6 +431,7 @@ input,textarea,select{ font-family: inherit; }
 .pill-row{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:12px; }
 .pill-static{ background: var(--mist); border:1px solid var(--line); border-radius: var(--r-pill); padding:7px 14px; font-size:12.5px; font-weight:600; color: var(--ink-soft); }
 .pill-static.tappable{ cursor:pointer; }
+.pill-static.pill-gold{ background: var(--gold); color:#fff; border-color: var(--gold); }
 
 /* ---------- Task list ---------- */
 .task-row-wrap{ padding: 6px 0; border-bottom:1px solid var(--line-soft); }
@@ -480,6 +516,17 @@ hr.hair{ border:none; border-top:1px solid var(--line-soft); margin: 18px 0; }
   width:64px; height:64px; border-radius:50%; background: var(--ink); color:#fff;
   display:flex; align-items:center; justify-content:center; box-shadow: var(--shadow-2);
 }
+
+/* ---------- Neighbor Home Value Follow-Up (one extra sign-in phase, Neighbors only) ---------- */
+.neighbor-offer-wrap{ max-width:360px; width:100%; }
+.neighbor-question{ font-size:16px; font-weight:600; color: var(--ink); margin-top:24px; margin-bottom:16px; }
+.neighbor-yn-row{ width:100%; gap:10px; }
+.neighbor-yn-btn{ padding:17px 14px; font-size:15.5px; }
+.neighbor-address-reveal{
+  width:100%; max-height:0; opacity:0; overflow:hidden;
+  transition: max-height .4s var(--ease), opacity .3s var(--ease), margin-top .4s var(--ease);
+}
+.neighbor-address-reveal.show{ max-height:220px; opacity:1; margin-top:20px; }
 
 /* ---------- Address autocomplete ---------- */
 .autocomplete-wrap{ position:relative; }
@@ -611,18 +658,39 @@ var BEDS_OPTIONS = ["1","2","3","4","5","6+"];
 var BATHS_OPTIONS = ["1","1.5","2","2.5","3","3.5","4","4.5","5+"];
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-var MOTIVATION_OPTIONS = ["First Home","Downsizing","Upsizing","Relocating","Investment","Closer to Family","Job Change","Lifestyle Change","Selling Current Home","Exploring","PCSing","Retiring"];
-
-var PREFERENCE_CATEGORIES = [
-  { name:"Home Style", options:["Single Story","Two Story","Primary Bedroom on First Floor","Open Floor Plan","Move-In Ready"] },
-  { name:"Size", options:["2+ Bedrooms","3+ Bedrooms","4+ Bedrooms","2+ Bathrooms","3+ Bathrooms","Guest Room","Home Office"] },
-  { name:"Kitchen", options:["Updated Kitchen","Large Kitchen"] },
-  { name:"Lot", options:["Large Backyard","Low-Maintenance Yard","Pool","RV Parking"] },
-  { name:"Financial", options:["No HOA","Low HOA","No Mello-Roos","Low Mello-Roos"] },
-  { name:"Lifestyle", options:["Quiet Street","Good School District","Close to Parks","Close to Shopping","Views"] },
-  { name:"Special Features", options:["Solar Owned","ADU Potential","Three-Car Garage"] }
+/* Organized into categories so the Motivation picker can show Category → Specific Feedback.
+   All 12 pre-existing values are preserved verbatim (only reordered into groups) — no renames. */
+var MOTIVATION_CATEGORIES = [
+  { name:"Life Stage",              options:["First Home","Upsizing","Downsizing","Retiring"] },
+  { name:"Life Change",             options:["Relocating","Job Change","Lifestyle Change","Closer to Family","PCSing"] },
+  { name:"Real Estate / Financial", options:["Investment","Selling Current Home"] },
+  { name:"Exploring",               options:["Exploring"] }
 ];
-var ALL_PREF_OPTIONS = PREFERENCE_CATEGORIES.reduce(function(acc,c){ return acc.concat(c.options); }, []);
+var MOTIVATION_OPTIONS = MOTIVATION_CATEGORIES.reduce(function(acc,c){ return acc.concat(c.options); }, []);
+
+/* Nice-to-Haves — standardized onto the same taxonomy as Must-Haves. RENAME MAP (see
+   NICE_TO_HAVE_RENAMES below) preserves already-saved selections that used old wording.
+   A few pre-existing values ("Close to Shopping", "Solar Owned", "ADU Potential",
+   "Low Mello-Roos") aren't part of the new named categories but are kept in
+   LEGACY_NICE_TO_HAVE_EXTRAS below so they still surface (via the picker's automatic "More"
+   tile) instead of silently disappearing for anyone who already selected them. */
+var PREFERENCE_CATEGORIES = [
+  { name:"Home Style & Layout", options:["Single Story","Two Story","Primary Bedroom on Main Level","Open Floor Plan","Home Office","Guest Room"] },
+  { name:"Size & Space",        options:["2+ Bedrooms","3+ Bedrooms","4+ Bedrooms","2+ Bathrooms","3+ Bathrooms","Extra Storage"] },
+  { name:"Kitchen & Condition", options:["Updated Kitchen","Large Kitchen","Move-In Ready","Newer / Updated Home"] },
+  { name:"Outdoor & Lot",       options:["Large Backyard","Pool","Large Lot","Views","Patio / Outdoor Entertaining","Low-Maintenance Yard"] },
+  { name:"Garage & Parking",    options:["2-Car Garage","3-Car Garage","RV / Boat Parking","Extra Driveway Parking"] },
+  { name:"Location & Community", options:["Quiet Street","Cul-de-Sac","Gated Community","Walkable","Nearby Parks","Good School District"] },
+  { name:"Cost & HOA",          options:["Low HOA","No HOA","No Mello-Roos"] }
+];
+var LEGACY_NICE_TO_HAVE_EXTRAS = ["Close to Shopping","Solar Owned","ADU Potential","Low Mello-Roos"];
+var ALL_PREF_OPTIONS = PREFERENCE_CATEGORIES.reduce(function(acc,c){ return acc.concat(c.options); }, []).concat(LEGACY_NICE_TO_HAVE_EXTRAS);
+var NICE_TO_HAVE_RENAMES = {
+  "Primary Bedroom on First Floor": "Primary Bedroom on Main Level",
+  "Three-Car Garage": "3-Car Garage",
+  "RV Parking": "RV / Boat Parking",
+  "Close to Parks": "Nearby Parks"
+};
 
 var PREFERRED_AREA_SEED = ["Chula Vista","Eastlake","Rancho Bernardo","Otay Ranch","Eastlake Vistas"];
 
@@ -647,17 +715,50 @@ var HOUSEHOLD_SIZES = ["1","2","3","4","5","6+"];
 var CHILDREN_STATUSES = ["Yes","No","Not Discussed"];
 var PET_OPTIONS = ["Dog","Cat","Multiple Pets","No Pets","Not Discussed"];
 var PET_EXCLUSIVE = ["No Pets","Not Discussed"];
-/* Reused as "This Home > Concerns / What They Didn't Like" — expanded from the original
-   14-item list into a fuller set of property-feedback concerns. */
-var DEALBREAKER_OPTIONS = ["Busy Street","High HOA","High Mello-Roos","Two Story","Small Kitchen","Small Backyard","Poor Layout","Major Renovation Needed","No Garage","Limited Parking","Freeway Noise","Railroad Noise","Too Far From Work","HOA Restrictions","Small Bedrooms","Dated Kitchen","Dated Bathrooms","Needs Cosmetic Work","Steep Driveway/Stairs","Not Enough Storage","Busy Intersection","Priced Too High","Lot Size Too Small","Dated Finishes Throughout","Backs to Commercial/Busy Road","Backs Directly to Neighbors"];
-var NEXT_ACTIONS = ["Call","Text","Email","Send Listings","Send Property Information","Lender Introduction","Schedule Buyer Consultation","Schedule Seller Consultation","Schedule Showing","Long-Term Follow-Up","No Follow-Up Needed"];
+/* Reused as "This Home > Concerns" (formerly "What They Didn't Like") — organized into
+   categories so the picker can show Category → Specific Feedback instead of one long list.
+   RENAME MAP below preserves any already-saved selections/admin option-list entries that used
+   the old pre-consolidation wording (see migrateContentShape/migrateVisitorRecord). */
+var DEALBREAKER_CATEGORIES = [
+  { name:"Layout & Space",     options:["Poor Layout","Too Small","Small Bedrooms","Small Primary Suite","Not Enough Storage","Too Many Stairs","Two Story","Single-Story Needed"] },
+  { name:"Kitchen & Baths",    options:["Small Kitchen","Dated Kitchen","Dated Bathrooms","Kitchen Needs Work","Bathrooms Need Work"] },
+  { name:"Outdoor & Exterior", options:["Small Backyard","Lot Too Small","Exterior Needs Work","Limited Privacy","Backs to Neighbors"] },
+  { name:"Location & Noise",   options:["Busy Street","Busy Intersection","Freeway Noise","Railroad Noise","Road Noise","Too Far From Work","Backs to Commercial / Busy Road"] },
+  { name:"Condition",          options:["Needs Cosmetic Work","Major Renovation Needed","Dated Finishes","Deferred Maintenance","Overall Condition"] },
+  { name:"Parking & Access",   options:["No Garage","Limited Parking","Steep Driveway","Stairs / Accessibility"] },
+  { name:"Cost & Fees",        options:["Priced Too High","High HOA","High Mello-Roos","HOA Restrictions","Monthly Payment Concern","Property Tax Concern"] }
+];
+var DEALBREAKER_OPTIONS = DEALBREAKER_CATEGORIES.reduce(function(acc,c){ return acc.concat(c.options); }, []);
+var DEALBREAKER_RENAMES = {
+  "Steep Driveway/Stairs": "Steep Driveway",
+  "Lot Size Too Small": "Lot Too Small",
+  "Dated Finishes Throughout": "Dated Finishes",
+  "Backs to Commercial/Busy Road": "Backs to Commercial / Busy Road",
+  "Backs Directly to Neighbors": "Backs to Neighbors"
+};
+var NEXT_ACTIONS = ["Call","Text","Email","Send Listings","Send Property Information","Lender Introduction","Schedule Buyer Consultation","Schedule Seller Consultation","Schedule Showing","Prepare Market Analysis","Long-Term Follow-Up","No Follow-Up Needed"];
 var ASSIGNEES = ["Jacy","Rich","Shared","Other DAG Team Member","Unassigned"];
 var FOLLOWUP_STATUSES = ["Not Started","In Progress","Completed"];
 var LEAD_TEMPERATURE_OPTIONS = ["Hot","Warm","Cold"];
 var PREFERRED_CONTACT_METHOD_OPTIONS = ["Call","Text","Email","No Preference"];
 
-/* ---- This Home (fast-tap feedback about the property being hosted today) ---- */
-var THIS_HOME_LIKED_OPTIONS = ["Kitchen","Backyard / Outdoor Space","Floor Plan","Natural Light","Primary Suite","Curb Appeal","Location","Size / Square Footage","Storage","Recent Updates","Neighborhood","Views","Garage","Price","Move-In Ready Condition"];
+/* ---- This Home (fast-tap feedback about the property being hosted today) ----
+   Organized into categories so the "What They Liked" picker can show Category → Specific
+   Feedback instead of one long list. RENAME MAP preserves any already-saved selections/admin
+   option-list entries that used the old pre-consolidation wording. */
+var THIS_HOME_LIKED_CATEGORIES = [
+  { name:"Layout & Space",     options:["Floor Plan","Size / Square Footage","Natural Light","Primary Suite","Storage","Single-Story Layout"] },
+  { name:"Kitchen & Baths",    options:["Kitchen","Bathrooms","Updated Kitchen","Updated Bathrooms"] },
+  { name:"Outdoor & Exterior", options:["Backyard / Outdoor Space","Lot","Curb Appeal","Exterior","Views"] },
+  { name:"Location",           options:["Location","Neighborhood","Street","Nearby Amenities"] },
+  { name:"Condition & Features", options:["Move-In Ready","Recent Updates","Finishes","Overall Condition"] },
+  { name:"Parking",            options:["Garage","Parking","Driveway"] },
+  { name:"Cost & Value",        options:["Price","HOA / Amenities","Value for the Price"] }
+];
+var THIS_HOME_LIKED_OPTIONS = THIS_HOME_LIKED_CATEGORIES.reduce(function(acc,c){ return acc.concat(c.options); }, []);
+var THIS_HOME_LIKED_RENAMES = {
+  "Move-In Ready Condition": "Move-In Ready"
+};
 var INTEREST_LEVEL_OPTIONS = ["Very Interested","Interested","Neutral","Not Interested"];
 var WOULD_CONSIDER_OFFER_OPTIONS = ["Yes","Maybe","No","Too Early to Say"];
 var PRICE_REACTION_OPTIONS = ["Feels Like Great Value","Feels Fairly Priced","Feels A Bit High","Feels Overpriced"];
@@ -668,8 +769,43 @@ var CURRENT_HOUSING_OPTIONS = ["Own", "Rent", "Living With Family", "Other"];
 var PROPERTY_TYPE_OPTIONS = ["Single Family","Condo","Townhouse","Multi-Family","Land","New Construction","Other"];
 var STORIES_OPTIONS = ["Single Story","Two Story","Either / No Preference"];
 var GARAGE_PARKING_OPTIONS = ["1 Car","2 Car","3+ Car","Carport","Street Parking Only","Not Discussed"];
-var MUST_HAVE_OPTIONS = ["Move-In Ready","Updated Kitchen","Primary Bedroom Downstairs","Home Office","Large Backyard","Pool","3-Car Garage","Good School District","Low HOA","Quiet Street","Open Floor Plan","Guest Room / Casita"];
-var SEARCH_DEALBREAKER_OPTIONS = ["Busy Street","No Garage","HOA","Small Lot","Steep Driveway","Shared Walls","No Yard","Flood Zone / Insurance","Long Commute","Older Roof/HVAC/Plumbing","Power Lines","Backs to Major Road"];
+/* Must-Haves — organized into categories so the picker can show Category → Specific Feedback.
+   "Single Story" and "Single Story Required" are intentionally both present (see Accessibility
+   category) — one is a style preference, the other is a hard non-negotiable requirement; note
+   this partially overlaps with the existing standalone "Stories" chip-group and "Single Story
+   Required" checkbox elsewhere on this card, which were left as-is per this update's scope. */
+var MUST_HAVE_CATEGORIES = [
+  { name:"Home Style & Layout", options:["Single Story","Primary Bedroom on Main Level","Open Floor Plan","Home Office","Guest Room / Casita"] },
+  { name:"Size & Space",        options:["2+ Bedrooms","3+ Bedrooms","4+ Bedrooms","2+ Bathrooms","3+ Bathrooms","Extra Storage"] },
+  { name:"Kitchen & Condition", options:["Updated Kitchen","Move-In Ready","Newer / Updated Home"] },
+  { name:"Outdoor & Lot",       options:["Large Backyard","Pool","Usable Outdoor Space"] },
+  { name:"Garage & Parking",    options:["2-Car Garage","3-Car Garage","RV / Boat Parking"] },
+  { name:"Location & Community", options:["Good School District","Quiet Street","Walkable","Close to Family / Work","Preferred Neighborhood"] },
+  { name:"Cost & HOA",          options:["Low HOA","No HOA","No Mello-Roos"] },
+  { name:"Accessibility",       options:["Minimal Stairs","Single Story Required"] }
+];
+var MUST_HAVE_OPTIONS = MUST_HAVE_CATEGORIES.reduce(function(acc,c){ return acc.concat(c.options); }, []);
+var MUST_HAVE_RENAMES = {
+  "Primary Bedroom Downstairs": "Primary Bedroom on Main Level"
+};
+
+/* Their Home Search > "Deal Breakers" — organized into categories. "Older Roof/HVAC/Plumbing"
+   is intentionally NOT auto-renamed/split into the new "Older Roof" / "Older HVAC" / "Older
+   Plumbing" options — that would be guessing which specific system an agent originally meant.
+   It stays in the live option list (still shows via the picker's automatic "More" tile) so
+   nothing already saved is lost or misrepresented. */
+var SEARCH_DEALBREAKER_CATEGORIES = [
+  { name:"Location & Surroundings", options:["Busy Street","Backs to Major Road","Long Commute","Power Lines","Flood Zone / Insurance Concern"] },
+  { name:"Property / Lot",          options:["Small Lot","No Yard","Shared Walls","Limited Privacy"] },
+  { name:"Access & Layout",         options:["Steep Driveway","Too Many Stairs","Two Story","No Main-Level Bedroom"] },
+  { name:"Garage & Parking",        options:["No Garage","Limited Parking","No Driveway"] },
+  { name:"Condition & Systems",     options:["Major Renovation Needed","Older Roof","Older HVAC","Older Plumbing","Significant Deferred Maintenance"] },
+  { name:"HOA & Cost",              options:["HOA","High HOA","High Mello-Roos","HOA Restrictions","Monthly Payment Too High"] }
+];
+var SEARCH_DEALBREAKER_OPTIONS = SEARCH_DEALBREAKER_CATEGORIES.reduce(function(acc,c){ return acc.concat(c.options); }, []);
+var SEARCH_DEALBREAKER_RENAMES = {
+  "Flood Zone / Insurance": "Flood Zone / Insurance Concern"
+};
 
 /* ============================================================
    CONTENT DEFAULTS — every override-able string, format, brand
@@ -695,7 +831,17 @@ var CONTENT_DEFAULTS = {
     otherPlaceholder: "Other",
     submitButton: "Submit Sign-In",
     confirmHeading: "You're all set.",
-    confirmMessage: "Thank you for stopping by {property}. We hope you enjoyed the visit."
+    confirmMessage: "Thank you for stopping by {property}. We hope you enjoyed the visit.",
+    /* Neighbor Home Value Follow-Up — shown only when the visitor identifies as a Neighbor,
+       immediately after their normal sign-in info is submitted and before the usual
+       thank-you/confirm screen. */
+    neighborHeading: "Curious what your home could be worth?",
+    neighborSubtext: "I'd be happy to put together a complimentary market analysis for you.",
+    neighborQuestion: "Would you like a free market analysis of your home?",
+    neighborYesButton: "Yes, please",
+    neighborNoButton: "Not right now",
+    neighborAddressPlaceholder: "Enter your property address",
+    neighborAddressSubmitButton: "Submit"
   },
   quickCapture: {
     title: "Quick Visitor Capture",
@@ -768,7 +914,7 @@ var CONTENT_DEFAULTS = {
       sectionFinancing: "Financing & Budget",
       sectionFamily: "Family",
       sectionPets: "Pets",
-      sectionDealBreakers: "What They Didn't Like",
+      sectionDealBreakers: "Concerns",
       sectionSearchDealBreakers: "Deal Breakers",
       sectionFollowUp: "Follow-Up",
       sectionConnectionSummary: "Personal Search Notes",
@@ -1081,6 +1227,44 @@ function mergeNewKeyedOption(listKey, key, label){
   var list = ol[listKey] || (ol[listKey] = []);
   if(!list.some(function(o){ return o.key===key; })) list.push({ key:key, label:label, active:true });
 }
+/* ---- One-time consolidation: some option-list items were renamed/merged into a cleaner
+   equivalent (see DEALBREAKER_RENAMES / THIS_HOME_LIKED_RENAMES). Renames the admin-editable
+   option list (and its archived copy) in place rather than leaving the old wording stranded
+   alongside the new — this is what "reduce duplication" means without losing any data. */
+function renameOptionListItem(listKey, oldValue, newValue){
+  var ol = state.content.optionLists;
+  var list = ol[listKey] || (ol[listKey] = []);
+  var idx = list.indexOf(oldValue);
+  if(idx > -1){
+    if(list.indexOf(newValue) > -1){ list.splice(idx,1); }
+    else{ list[idx] = newValue; }
+  }
+  var archived = ol.archived && ol.archived[listKey];
+  if(archived){
+    var aIdx = archived.indexOf(oldValue);
+    if(aIdx > -1){
+      if(archived.indexOf(newValue) > -1){ archived.splice(aIdx,1); }
+      else{ archived[aIdx] = newValue; }
+    }
+  }
+}
+/* Same rename, applied to a single visitor's already-saved selection array (dealBreakers.selected
+   or thisHome.liked) so existing feedback survives the wording consolidation intact. */
+function renameSelectedValue(arr, oldValue, newValue){
+  if(!arr) return arr;
+  var idx = arr.indexOf(oldValue);
+  if(idx===-1) return arr;
+  if(arr.indexOf(newValue) > -1){ arr.splice(idx,1); }
+  else{ arr[idx] = newValue; }
+  return arr;
+}
+/* Renames a piece of saved copy only if it still exactly matches the OLD default text — i.e.
+   only un-customized labels follow the rename forward. Any admin who already edited this copy
+   to something else keeps their own wording untouched. */
+function renameContentDefaultIfUnchanged(path, oldDefault, newDefault){
+  var cur = getPath(state.content, path);
+  if(cur === oldDefault) setPath(state.content, path, newDefault);
+}
 /* Section ids for the Visitor Profile fundamentally changed meaning (old: motivation/preferences/
    preferredAreas/financing/family/pets/dealBreakers/followUp/connectionSummary/tasks — new: two
    unified This Home / Their Home Search sections + Follow-Up + Tasks), so an existing saved
@@ -1352,6 +1536,8 @@ function migrateVisitorDetail(old){
     old.desiredBaths = old.desiredBaths || "";
     old.garageParking = old.garageParking || "";
     old.searchDealBreakers = obj(old.searchDealBreakers); old.searchDealBreakers.selected = arr(old.searchDealBreakers.selected); old.searchDealBreakers.note = old.searchDealBreakers.note || "";
+    old.homeAddress = old.homeAddress || "";
+    old.homeValuationRequested = !!old.homeValuationRequested;
     old.tasks = arr(old.tasks).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; });
     old.notesComplete = !!old.notesComplete;
     return old;
@@ -1437,6 +1623,8 @@ function migrateVisitorDetail(old){
     currentHousing: "", propertyType: [], stories: "", singleStoryRequired: false,
     desiredBeds: "", desiredBaths: "", garageParking: "",
     searchDealBreakers: { selected: [], note: "" },
+    homeAddress: old.homeAddress || "",
+    homeValuationRequested: !!old.homeValuationRequested,
     tasks: arr(old.tasks).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; }),
     notesComplete: !!old.notesComplete
   };
@@ -1467,7 +1655,25 @@ function migrateContentShape(){
   migrateKeyedListShape("representations", "representationLabels", REP_KEYS);
   migrateTeamMemberShape();
   mergeNewKeyedOption("visitPurposes", "investing", "Investing");
+  /* "What They Didn't Like" → "Concerns" (neutral, professional language) — only applied if
+     the label was still the un-customized old default. */
+  renameContentDefaultIfUnchanged("pages.visitorDetail.sectionDealBreakers", "What They Didn't Like", "Concerns");
+  Object.keys(DEALBREAKER_RENAMES).forEach(function(old){ renameOptionListItem("dealBreakerOptions", old, DEALBREAKER_RENAMES[old]); });
+  Object.keys(THIS_HOME_LIKED_RENAMES).forEach(function(old){ renameOptionListItem("thisHomeLikedOptions", old, THIS_HOME_LIKED_RENAMES[old]); });
   mergeNewSimpleOptionItems("dealBreakerOptions", DEALBREAKER_OPTIONS);
+  mergeNewSimpleOptionItems("thisHomeLikedOptions", THIS_HOME_LIKED_OPTIONS);
+  /* Their Home Search categorized-picker update: Must-Haves / Deal Breakers both have an
+     admin-editable option list, so renames + new-item merges follow the same established
+     pattern as Concerns/What They Liked above. Motivation only got reordered (no renames/new
+     items) so it needs no extra step; Nice-to-Haves has no admin option list (never did — see
+     ALL_PREF_OPTIONS/LEGACY_NICE_TO_HAVE_EXTRAS) so it's handled purely at the visitor-record
+     level below. */
+  Object.keys(MUST_HAVE_RENAMES).forEach(function(old){ renameOptionListItem("mustHaveOptions", old, MUST_HAVE_RENAMES[old]); });
+  Object.keys(SEARCH_DEALBREAKER_RENAMES).forEach(function(old){ renameOptionListItem("searchDealBreakerOptions", old, SEARCH_DEALBREAKER_RENAMES[old]); });
+  mergeNewSimpleOptionItems("mustHaveOptions", MUST_HAVE_OPTIONS);
+  mergeNewSimpleOptionItems("searchDealBreakerOptions", SEARCH_DEALBREAKER_OPTIONS);
+  /* Neighbor Home Value Follow-Up: "Prepare Market Analysis" is a new Next Action option. */
+  mergeNewSimpleOptionItems("nextActions", NEXT_ACTIONS);
   mergeNewSimpleOptionItems("preApprovalStatuses", PREAPPROVAL_STATUSES);
   migrateVisitorDetailSectionsV2();
   mergeNewFieldConfigs("visitorDetailSimple");
@@ -1493,6 +1699,17 @@ function migrateVisitorRecord(v){
      conservative assumption — never inflates historical visitor counts). */
   if(!v.partySize) v.partySize = "1";
   v.detail = migrateVisitorDetail(v.detail);
+  /* Consolidate any already-saved Concerns / What They Liked selections that used the old
+     pre-consolidation wording — see DEALBREAKER_RENAMES / THIS_HOME_LIKED_RENAMES. Existing
+     feedback is preserved, just relabeled to its cleaner equivalent. */
+  Object.keys(DEALBREAKER_RENAMES).forEach(function(old){ renameSelectedValue(v.detail.dealBreakers.selected, old, DEALBREAKER_RENAMES[old]); });
+  Object.keys(THIS_HOME_LIKED_RENAMES).forEach(function(old){ renameSelectedValue(v.detail.thisHome.liked, old, THIS_HOME_LIKED_RENAMES[old]); });
+  /* Same consolidation for the Their Home Search categorized-picker update — Must-Haves,
+     Nice-to-Haves, and Deal Breakers each preserve already-saved selections under their
+     cleaner, de-duplicated wording. Motivation has no renames. */
+  Object.keys(MUST_HAVE_RENAMES).forEach(function(old){ renameSelectedValue(v.detail.mustHaves.selected, old, MUST_HAVE_RENAMES[old]); });
+  Object.keys(NICE_TO_HAVE_RENAMES).forEach(function(old){ renameSelectedValue(v.detail.niceToHaves.selected, old, NICE_TO_HAVE_RENAMES[old]); });
+  Object.keys(SEARCH_DEALBREAKER_RENAMES).forEach(function(old){ renameSelectedValue(v.detail.searchDealBreakers.selected, old, SEARCH_DEALBREAKER_RENAMES[old]); });
   return v;
 }
 function migrateState(){
@@ -1583,6 +1800,10 @@ function newVisitor(openHouseId, data, capturedLater){
       desiredBaths: "",
       garageParking: "",
       searchDealBreakers: { selected:[], note:"" },
+      /* Neighbor Home Value Follow-Up — only ever populated for visitors identified as
+         Neighbor (visitPurpose/contactType "neighbor"); left blank/false for everyone else. */
+      homeAddress: "",
+      homeValuationRequested: false,
       /* Every new visitor record — sign-in kiosk or agent quick capture — gets these
          two follow-up tasks automatically, so nothing depends on an agent remembering
          to add them by hand. */
@@ -2413,6 +2634,33 @@ function screenSignIn(){
       '</div>';
   }
 
+  /* Neighbor Home Value Follow-Up — inserted only for visitors who identified as Neighbor
+     at sign-in, between their form submission and the normal thank-you/confirm screen.
+     Kept as one extra phase of the same "signin" route (not a separate route) so it reuses
+     the exact same visitor record via route.params.visitorId — no new record is ever created
+     here, and every other visitor type never sees this phase at all. */
+  if(phase === "neighborOffer"){
+    return '<div class="screen signin-screen">' +
+      '<div class="signin-confirm-wrap neighbor-offer-wrap">' +
+        '<div class="glyph-ring">'+ICONS.home+'</div>' +
+        '<h1>'+esc(cfg("signin.neighborHeading"))+'</h1>' +
+        '<p>'+esc(cfg("signin.neighborSubtext"))+'</p>' +
+        '<div class="neighbor-question">'+esc(cfg("signin.neighborQuestion"))+'</div>' +
+        '<div class="toggle-row neighbor-yn-row">' +
+          '<button type="button" class="chip neighbor-yn-btn" id="n-yes">'+esc(cfg("signin.neighborYesButton"))+'</button>' +
+          '<button type="button" class="chip neighbor-yn-btn" id="n-no">'+esc(cfg("signin.neighborNoButton"))+'</button>' +
+        '</div>' +
+        '<div class="neighbor-address-reveal" id="n-address-reveal">' +
+          '<div class="field" style="text-align:left;margin-top:4px;">' +
+            '<label>Home Address</label>' +
+            '<input type="text" id="n-address" placeholder="'+esc(cfg("signin.neighborAddressPlaceholder"))+'" autocomplete="off">' +
+          '</div>' +
+          '<button type="button" class="btn btn-primary" id="n-address-submit" style="width:100%;">'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
+        '</div>' +
+      '</div>' +
+      '</div>';
+  }
+
   var nameF = fieldCfg("signin","name"), phoneF = fieldCfg("signin","phone"), emailF = fieldCfg("signin","email");
   var identityBlock =
     '<div class="card">' +
@@ -2420,11 +2668,6 @@ function screenSignIn(){
       '<div class="field-row">' +
         (phoneF.visible!==false ? '<div class="field"><label>Phone'+(phoneF.required?' <span class="req-mark">*</span>':'')+'</label><input type="tel" id="s-phone" placeholder="'+esc(cfg("signin.phonePlaceholder"))+'" inputmode="tel"></div>' : '') +
         (emailF.visible!==false ? '<div class="field" style="margin-bottom:0;"><label>Email'+(emailF.required?' <span class="req-mark">*</span>':'')+'</label><input type="email" id="s-email" placeholder="'+esc(cfg("signin.emailPlaceholder"))+'"></div>' : '') +
-      '</div>' +
-      '<div class="field" style="margin-bottom:0;margin-top:16px;"><label>How Many In Your Group?</label>' +
-        '<div class="toggle-row" id="s-party">' +
-          PARTY_SIZE_OPTIONS.map(function(n){ return '<button type="button" class="chip'+(n==="1"?" selected":"")+'" data-val="'+n+'">'+n+'</button>'; }).join("") +
-        '</div>' +
       '</div>' +
     '</div>';
 
@@ -2466,11 +2709,10 @@ function screenSignIn(){
 function mountSignIn(){
   var oh = activeOpenHouse();
   if(!oh) return;
-  var picked = { representationStatus:"", visitPurpose:"", partySize:"1" };
+  var picked = { representationStatus:"", visitPurpose:"" };
 
   var repGroup = document.querySelector("#s-rep");
   var purposeGroup = document.querySelector("#s-purpose");
-  var partyGroup = document.querySelector("#s-party");
   var phoneInput = document.querySelector("#s-phone");
   if(phoneInput){ bindPhoneInput(phoneInput); }
   initAutosizeTextareas(document);
@@ -2487,16 +2729,6 @@ function mountSignIn(){
   }
   wire(repGroup, "representationStatus");
   wire(purposeGroup, "visitPurpose");
-  /* Party size always keeps exactly one selection (defaults to "1") — tapping the same
-     chip again doesn't clear it, since a group size of zero doesn't make sense. */
-  if(partyGroup){
-    partyGroup.addEventListener("click", function(e){
-      var btn = e.target.closest(".chip"); if(!btn) return;
-      Array.prototype.forEach.call(partyGroup.querySelectorAll(".chip"), function(c){ c.classList.remove("selected"); });
-      picked.partySize = btn.getAttribute("data-val");
-      btn.classList.add("selected");
-    });
-  }
 
   var submitBtn = document.querySelector("#s-submit");
   if(submitBtn){
@@ -2518,13 +2750,84 @@ function mountSignIn(){
         representationStatus: picked.representationStatus,
         visitPurpose: picked.visitPurpose,
         visitPurposeOther: otherEl ? otherEl.value.trim() : "",
-        partySize: picked.partySize,
+        /* Group size is no longer asked at self-serve sign-in — newVisitor() defaults
+           partySize to "1", so every self-signed-in lead counts as one visitor. Quick
+           Capture (agent-facing) still lets an agent note a larger group by hand when
+           they can see it in person. */
         source: "selfSignIn"
       }, true);
       state.visitors.push(v);
       saveState();
-      nav("signin", { phase:"confirm" });
-      setTimeout(function(){ nav("signin", { phase:"form" }); }, 2800);
+      /* Neighbor Home Value Follow-Up: everyone else goes straight to the normal thank-you
+         screen (unchanged); a Neighbor sees one extra low-pressure phase first, reusing this
+         exact same visitor record (v.id) — no duplicate record is ever created. */
+      if(picked.visitPurpose === "neighbor"){
+        nav("signin", { phase:"neighborOffer", visitorId: v.id });
+      } else {
+        nav("signin", { phase:"confirm" });
+        setTimeout(function(){ nav("signin", { phase:"form" }); }, 2800);
+      }
+    });
+  }
+}
+
+/* Neighbor Home Value Follow-Up — only mounted for phase:"neighborOffer", which only ever
+   happens right after a Neighbor's own sign-in submission (see mountSignIn above). */
+function mountNeighborOffer(){
+  var nv = findVisitor(route.params.visitorId);
+  if(!nv){
+    /* Safety net only — should not happen in normal use, since we always pass the id of the
+       record we just created. Falls back to the standard completion experience. */
+    nav("signin", { phase:"confirm" });
+    setTimeout(function(){ nav("signin", { phase:"form" }); }, 2800);
+    return;
+  }
+  var d = nv.detail;
+
+  function goToConfirm(){
+    nav("signin", { phase:"confirm" });
+    setTimeout(function(){ nav("signin", { phase:"form" }); }, 2800);
+  }
+
+  var yesBtn = document.querySelector("#n-yes");
+  var noBtn = document.querySelector("#n-no");
+  var reveal = document.querySelector("#n-address-reveal");
+  var addressEl = document.querySelector("#n-address");
+  var addressSubmitBtn = document.querySelector("#n-address-submit");
+
+  if(yesBtn){
+    yesBtn.addEventListener("click", function(){
+      yesBtn.classList.add("selected");
+      if(noBtn) noBtn.classList.remove("selected");
+      if(reveal){
+        reveal.classList.add("show");
+        setTimeout(function(){ if(addressEl) addressEl.focus(); }, 350);
+      }
+    });
+  }
+  if(noBtn){
+    noBtn.addEventListener("click", function(){
+      /* Declining is not a negative lead status — just skip straight to the existing
+         completion experience with nothing further asked. */
+      noBtn.classList.add("selected");
+      if(yesBtn) yesBtn.classList.remove("selected");
+      goToConfirm();
+    });
+  }
+  if(addressSubmitBtn){
+    addressSubmitBtn.addEventListener("click", function(){
+      var address = addressEl ? addressEl.value.trim() : "";
+      if(!address){ if(addressEl) addressEl.focus(); toast("Enter your property address"); return; }
+      /* Reuses this visitor's existing record — never creates a second one. Source stays
+         whatever it already was (the current Open House), contact type/priority is left as
+         the auto-detected "Neighbor" (see CONTACT_TYPE_AUTO_MAP), so this person can still
+         separately be tracked as a potential buyer/seller without being forced into one
+         category. */
+      d.homeAddress = address;
+      d.homeValuationRequested = true;
+      if(!d.followUp.nextAction) d.followUp.nextAction = "Prepare Market Analysis";
+      saveState();
+      goToConfirm();
     });
   }
 }
@@ -2776,26 +3079,47 @@ function prefCategoryChipsHtml(cardKey, selectedArr){
    Tapping the field opens a sheet with the full option list; once closed, the field itself
    only ever shows the options that were actually picked (or a placeholder), never the whole list. */
 var MULTI_SELECT_CONFIG = {
-  motivation:    { title:"Motivation",              path:"motivation.selected",           flat: MOTIVATION_OPTIONS,       placeholder:"Select motivation(s)…" },
-  /* Reused as This Home > "What They Didn't Like / Concerns" — path unchanged so existing
-     saved deal-breaker selections carry forward as-is. */
-  dealBreakers:  { title:"What They Didn't Like",   path:"dealBreakers.selected",         flat: DEALBREAKER_OPTIONS,      placeholder:"Select concern(s)…" },
-  /* Must-Haves now lives under Their Home Search with its own flat suggested-chip list
-     (previously grouped by category) — legacy grouped selections still display fine since
-     multiSelectFieldHtml only ever renders the stored values, regardless of the option source. */
-  mustHaves:     { title:"Must-Haves",              path:"mustHaves.selected",            flat: MUST_HAVE_OPTIONS,        otherKey:"niceToHaves", placeholder:"Select must-have(s)…" },
-  niceToHaves:   { title:"Nice-to-Haves",            path:"niceToHaves.selected",          grouped: PREFERENCE_CATEGORIES, otherKey:"mustHaves",   placeholder:"Select nice-to-have(s)…" },
+  /* Their Home Search categorized-picker update: Motivation, Must-Haves, Nice-to-Haves, and
+     Deal Breakers all now use the same Category → Specific Feedback interaction as Concerns /
+     What They Liked, plus a chip-style "+ Add Custom" (customAdd:true) — typed custom entries
+     are pushed straight into the selected array so they display and count exactly like any
+     other selection. The underlying stored values are always the individual specific items,
+     never the category name, so existing summaries/exports keep working unchanged. */
+  motivation:    { title:"Motivation",              path:"motivation.selected",           flat: MOTIVATION_OPTIONS,       categories: MOTIVATION_CATEGORIES,       customAdd:true, customPlaceholder:"Type a custom motivation…",     compactSummary:true, placeholder:"Select motivation(s)…" },
+  /* Reused as This Home > "Concerns" (formerly "What They Didn't Like") — path unchanged so
+     existing saved selections carry forward as-is. Category → Specific Feedback picker: the
+     underlying stored values are still the individual specific items (never the category name),
+     so Analytics keeps aggregating exactly as before. */
+  dealBreakers:  { title:"Concerns",                path:"dealBreakers.selected",         flat: DEALBREAKER_OPTIONS,      categories: DEALBREAKER_CATEGORIES,      otherNotePath:"dealBreakers.note",   placeholder:"Select concern(s)…",     otherPlaceholder:"Add a short note…" },
+  mustHaves:     { title:"Must-Haves",              path:"mustHaves.selected",            flat: MUST_HAVE_OPTIONS,        categories: MUST_HAVE_CATEGORIES,        otherKey:"niceToHaves", customAdd:true, customPlaceholder:"Type a custom must-have…",   compactSummary:true, placeholder:"Select must-have(s)…" },
+  /* Standardized onto the exact same category taxonomy as Must-Haves (see PREFERENCE_CATEGORIES
+     above) — previously used a "grouped" mode that showed every category at once. flat here is
+     ALL_PREF_OPTIONS, which also carries a few legacy values that fell outside the new named
+     categories (see LEGACY_NICE_TO_HAVE_EXTRAS) so they still surface via the "More" tile. */
+  niceToHaves:   { title:"Nice-to-Haves",            path:"niceToHaves.selected",          flat: ALL_PREF_OPTIONS,         categories: PREFERENCE_CATEGORIES,       otherKey:"mustHaves",   customAdd:true, customPlaceholder:"Type a custom nice-to-have…", compactSummary:true, placeholder:"Select nice-to-have(s)…" },
   pets:          { title:"Pets",                     path:"pets.selected",                 flat: PET_OPTIONS,               exclusive: PET_EXCLUSIVE, placeholder:"Select pet detail(s)…" },
-  thisHomeLiked: { title:"What They Liked",          path:"thisHome.liked",                flat: THIS_HOME_LIKED_OPTIONS,  placeholder:"Select what stood out…" },
+  /* Category → Specific Feedback picker: underlying stored values are still the individual
+     specific items (never the category name), so Analytics keeps aggregating exactly as before. */
+  thisHomeLiked: { title:"What They Liked",          path:"thisHome.liked",                flat: THIS_HOME_LIKED_OPTIONS,  categories: THIS_HOME_LIKED_CATEGORIES,  otherNotePath:"thisHome.likedNote",  placeholder:"Select what stood out…", otherPlaceholder:"Add a short note…" },
   propertyType:  { title:"Property Type",            path:"propertyType",                  flat: PROPERTY_TYPE_OPTIONS,    placeholder:"Select property type(s)…" },
-  searchDealBreakers: { title:"Deal Breakers",       path:"searchDealBreakers.selected",    flat: SEARCH_DEALBREAKER_OPTIONS, placeholder:"Select deal breaker(s)…" }
+  searchDealBreakers: { title:"Deal Breakers",       path:"searchDealBreakers.selected",    flat: SEARCH_DEALBREAKER_OPTIONS, categories: SEARCH_DEALBREAKER_CATEGORIES, customAdd:true, customPlaceholder:"Type a custom deal breaker…", compactSummary:true, placeholder:"Select deal breaker(s)…" }
 };
 function multiSelectFieldHtml(key, selectedArr){
   selectedArr = selectedArr || [];
   var entry = MULTI_SELECT_CONFIG[key];
-  var body = selectedArr.length
-    ? '<div class="ms-chips">' + selectedArr.map(function(v){ return '<span class="ms-chip">'+esc(v)+'</span>'; }).join("") + '</div>'
-    : '<span class="ms-placeholder">'+esc(entry.placeholder)+'</span>';
+  var body;
+  if(!selectedArr.length){
+    body = '<span class="ms-placeholder">'+esc(entry.placeholder)+'</span>';
+  } else if(entry.compactSummary){
+    /* Their Home Search categorized-picker update: a short text line ("X · Y · +3 more")
+       instead of a chip wall, so the Visitor page stays calm even with many selections.
+       Scoped to entry.compactSummary — This Home fields (Concerns/What They Liked) keep their
+       existing .ms-chips display untouched. */
+    var preview = selectedArr.slice(0,2).join(" · ") + (selectedArr.length>2 ? "  +"+(selectedArr.length-2)+" more" : "");
+    body = '<span class="ms-summary-text">'+esc(preview)+'</span>';
+  } else {
+    body = '<div class="ms-chips">' + selectedArr.map(function(v){ return '<span class="ms-chip">'+esc(v)+'</span>'; }).join("") + '</div>';
+  }
   return '<button type="button" class="ms-field" data-action="openMultiSelect" data-ms-key="'+esc(key)+'">' +
     '<span class="ms-field-body">'+body+'</span><span class="ms-field-chev">'+ICONS.chev+'</span>' +
   '</button>';
@@ -2806,8 +3130,102 @@ function sheetMultiSelectPicker(v, key){
   var d = v.detail;
   var selected = (getPath(d, entry.path) || []).slice();
   var otherArr = entry.otherKey ? (getPath(d, entry.otherKey+".selected") || []).slice() : null;
+  var otherNoteDraft = entry.otherNotePath ? (getPath(d, entry.otherNotePath) || "") : "";
+  var bodyEl = null; /* assigned once the sheet is mounted, below */
+
+  /* Category → Specific Feedback: null = showing the category grid; a number = showing that
+     category's options; "other" = showing the free-text "Other" entry. Selections made in any
+     category persist in `selected` regardless of which category is currently open, so moving
+     between categories never loses previous picks. */
+  var activeCategory = null;
+
+  /* Reads #ms-custom-input, pushes a trimmed non-empty/non-duplicate value straight into
+     `selected` (so it displays and counts exactly like any predefined option), then re-renders
+     the "Other" screen with the input cleared and the new item listed as a chip. */
+  function addCustomFromInput(){
+    var inp = document.getElementById("ms-custom-input");
+    if(!inp) return;
+    var val = (inp.value||"").trim();
+    if(val && selected.indexOf(val)===-1) selected.push(val);
+    bodyEl.innerHTML = rowsHtml();
+  }
+
+  function selectedSummaryHtml(){
+    if(!selected.length) return "";
+    var preview = selected.slice(0,4).join(" · ") + (selected.length>4 ? "  +"+(selected.length-4)+" more" : "");
+    return '<div class="ms-selected-summary"><span class="ms-selected-count">Selected · '+selected.length+'</span><span class="ms-selected-preview">'+esc(preview)+'</span></div>';
+  }
+
+  /* Builds the category grid from entry.categories, filtered against the live (admin-editable)
+     option list so archived/removed items never show — any option that's in the live list but
+     not in a named category (e.g. an admin-added custom item) falls into an auto "More" tile
+     rather than being silently hidden. */
+  function buildCategoryList(){
+    var assigned = {};
+    var cats = (entry.categories||[]).map(function(cat){
+      var opts = cat.options.filter(function(o){ return entry.flat.indexOf(o) > -1; });
+      opts.forEach(function(o){ assigned[o] = true; });
+      return { name: cat.name, options: opts };
+    }).filter(function(c){ return c.options.length; });
+    var extra = entry.flat.filter(function(o){ return !assigned[o]; });
+    if(extra.length) cats.push({ name:"More", options: extra });
+    return cats;
+  }
+
+  function categoryTileHtml(cat, idx){
+    var count = cat.options.filter(function(o){ return selected.indexOf(o)>-1; }).length;
+    return '<button type="button" class="cat-tile" data-cat-idx="'+idx+'">' +
+      '<span class="cat-tile-label">'+esc(cat.name)+'</span>' +
+      (count ? '<span class="cat-tile-count">'+count+'</span>' : '') +
+    '</button>';
+  }
+
+  /* Custom entries (customAdd mode) are pushed straight into `selected` — anything the user
+     typed that isn't one of the predefined/admin options. Rendered as removable chips inside
+     the "Other" screen using the same [data-ms-val] toggle as every other option. */
+  function customSelectedItems(){
+    return selected.filter(function(s){ return entry.flat.indexOf(s) === -1; });
+  }
 
   function rowsHtml(){
+    if(entry.categories){
+      var cats = buildCategoryList();
+      if(activeCategory === null){
+        var otherCount = entry.customAdd ? customSelectedItems().length : (entry.otherNotePath && otherNoteDraft.trim().length>0 ? 1 : 0);
+        return '<div class="cat-grid">' +
+            cats.map(function(cat,idx){ return categoryTileHtml(cat, idx); }).join("") +
+            ((entry.otherNotePath || entry.customAdd) ? '<button type="button" class="cat-tile cat-tile-other" data-cat-idx="other"><span class="cat-tile-label">'+(entry.customAdd?"+ Add Custom":"+ Other")+'</span>'+(otherCount?'<span class="cat-tile-count">'+(entry.customAdd?otherCount:"•")+'</span>':'')+'</button>' : '') +
+          '</div>' +
+          selectedSummaryHtml();
+      }
+      if(activeCategory === "other"){
+        if(entry.customAdd){
+          var customItems = customSelectedItems();
+          return '<button type="button" class="cat-back" data-cat-back>‹ All Categories</button>' +
+            '<div class="cat-active-label">Add Custom</div>' +
+            '<div class="custom-add-row">' +
+              '<input type="text" id="ms-custom-input" class="ms-custom-input" placeholder="'+esc(entry.customPlaceholder||"Type a custom item…")+'">' +
+              '<button type="button" class="btn btn-secondary btn-sm" id="ms-custom-add">Add</button>' +
+            '</div>' +
+            (customItems.length ? '<div class="chip-group cat-options" style="margin-top:14px;">' + customItems.map(function(opt){
+              return '<button type="button" class="chip chip-compact selected" data-ms-val="'+esc(opt)+'">'+esc(opt)+'</button>';
+            }).join("") + '</div>' : '') +
+            selectedSummaryHtml();
+        }
+        return '<button type="button" class="cat-back" data-cat-back>‹ All Categories</button>' +
+          '<div class="cat-active-label">Other</div>' +
+          '<textarea class="optional-detail" id="ms-other-note" placeholder="'+esc(entry.otherPlaceholder||entry.placeholder)+'">'+esc(otherNoteDraft)+'</textarea>' +
+          selectedSummaryHtml();
+      }
+      var cat = cats[activeCategory];
+      if(!cat){ activeCategory = null; return rowsHtml(); }
+      return '<button type="button" class="cat-back" data-cat-back>‹ All Categories</button>' +
+        '<div class="cat-active-label">'+esc(cat.name)+'</div>' +
+        '<div class="chip-group cat-options">' + cat.options.map(function(opt){
+          return '<button type="button" class="chip chip-compact'+(selected.indexOf(opt)>-1?" selected":"")+'" data-ms-val="'+esc(opt)+'">'+esc(opt)+'</button>';
+        }).join("") + '</div>' +
+        selectedSummaryHtml();
+    }
     if(entry.grouped){
       return entry.grouped.map(function(cat){
         return '<div class="pref-category">' +
@@ -2832,8 +3250,26 @@ function sheetMultiSelectPicker(v, key){
 
   openSheet(body, function(sheet, close){
     sheet.querySelector("[data-sheet-close]").addEventListener("click", close);
-    var bodyEl = sheet.querySelector("#ms-body");
+    bodyEl = sheet.querySelector("#ms-body");
     bodyEl.addEventListener("click", function(e){
+      var catTile = e.target.closest("[data-cat-idx]");
+      if(catTile){
+        var ci = catTile.getAttribute("data-cat-idx");
+        activeCategory = (ci === "other") ? "other" : parseInt(ci,10);
+        bodyEl.innerHTML = rowsHtml();
+        return;
+      }
+      var backBtn = e.target.closest("[data-cat-back]");
+      if(backBtn){
+        activeCategory = null;
+        bodyEl.innerHTML = rowsHtml();
+        return;
+      }
+      var addBtn = e.target.closest("#ms-custom-add");
+      if(addBtn){
+        addCustomFromInput();
+        return;
+      }
       var chip = e.target.closest("[data-ms-val]");
       if(!chip) return;
       var val = chip.getAttribute("data-ms-val");
@@ -2851,9 +3287,19 @@ function sheetMultiSelectPicker(v, key){
       }
       bodyEl.innerHTML = rowsHtml();
     });
+    bodyEl.addEventListener("input", function(e){
+      if(e.target && e.target.id === "ms-other-note") otherNoteDraft = e.target.value;
+    });
+    bodyEl.addEventListener("keydown", function(e){
+      if(e.target && e.target.id === "ms-custom-input" && e.key === "Enter"){
+        e.preventDefault();
+        addCustomFromInput();
+      }
+    });
     sheet.querySelector("#ms-done").addEventListener("click", function(){
       setPath(d, entry.path, selected);
       if(entry.otherKey) setPath(d, entry.otherKey+".selected", otherArr);
+      if(entry.otherNotePath) setPath(d, entry.otherNotePath, otherNoteDraft);
       saveState(); flashAutosave();
       close();
       appEl.removeEventListener("click", globalClickHandler);
@@ -2906,6 +3352,8 @@ function screenVisitorDetail(){
   if(v.buyingTimeline && v.buyingTimeline!=="unknown") headerPills.push('<span class="pill-static">'+esc(timelineLabel(v.buyingTimeline))+'</span>');
   if(v.representationStatus) headerPills.push('<span class="pill-static">'+esc(repLabel(v.representationStatus))+'</span>');
   (d.motivation.selected||[]).forEach(function(m){ headerPills.push('<span class="pill-static">'+esc(m)+'</span>'); });
+  /* Neighbor Home Value Follow-Up: clearly surfaced at the top of the record, not buried. */
+  if(d.homeValuationRequested) headerPills.push('<span class="pill-static pill-gold">Home Valuation Requested</span>');
 
   var headerCard =
     '<div class="card" style="text-align:center;">' +
@@ -2948,7 +3396,7 @@ function screenVisitorDetail(){
         optionalDetailHtml("thisHome.likedNote", d.thisHome.likedNote, "Anything else they liked?", null) +
       '</div>' +
       '<div class="card section-card-thishome">' +
-        '<div class="th-field" style="margin-bottom:0;"><label>'+esc(vdc.sectionDealBreakers)+' / Concerns</label>'+multiSelectFieldHtml("dealBreakers", d.dealBreakers.selected)+'</div>' +
+        '<div class="th-field" style="margin-bottom:0;"><label>'+esc(vdc.sectionDealBreakers)+'</label>'+multiSelectFieldHtml("dealBreakers", d.dealBreakers.selected)+'</div>' +
         optionalDetailHtml("dealBreakers.note", d.dealBreakers.note, cfg("signin.otherPlaceholder"), null) +
       '</div>' +
       '<div class="card section-card-thishome">' +
@@ -2970,6 +3418,19 @@ function screenVisitorDetail(){
         '<div class="th-field"><label>Real Estate Goal</label><div class="chip-group">'+chipGroupHtml(VISIT_PURPOSES, "visitPurpose", v.visitPurpose)+'</div></div>' +
         '<div class="th-field" style="margin-bottom:0;"><label>Timeline</label><div class="toggle-row">'+chipGroupHtml(TIMELINES, "buyingTimeline", v.buyingTimeline)+'</div></div>' +
       '</div>' +
+      /* Neighbor Home Value Follow-Up — only ever shown for visitors identified as Neighbor.
+         A neighbor may simultaneously be a potential seller, a future buyer, both, or simply
+         curious, so this never overrides or hides their Real Estate Goal / Timeline above —
+         it's additive. Home Address is directly editable here (data-field, same generic
+         binding as every other field) so an agent can add/correct it even for a Neighbor
+         captured through Quick Capture rather than the kiosk. */
+      (v.contactType==="neighbor" ? subHead("Neighbor · Home Value") +
+        '<div class="card section-card-theirsearch">' +
+          (d.homeValuationRequested ? '<div class="pill-row" style="margin-bottom:14px;"><span class="pill-static pill-gold">Home Valuation Requested</span></div>' : '') +
+          '<div class="field"><label>Home Address</label><input type="text" data-field="homeAddress" value="'+esc(d.homeAddress)+'" placeholder="Enter their property address"></div>' +
+          '<div class="single-story-row" style="margin-top:2px;margin-bottom:0;"><input type="checkbox" id="home-valuation-requested" '+(d.homeValuationRequested?"checked":"")+'><label for="home-valuation-requested">Home Valuation Requested</label></div>' +
+          (d.homeValuationRequested && d.followUp.nextAction ? '<div style="margin-top:14px;font-size:13px;color:var(--ink-soft);">Next Action: <b style="color:var(--ink);">'+esc(d.followUp.nextAction)+'</b></div>' : '') +
+        '</div>' : '') +
       (chsF.visible!==false ? '<div class="card section-card-theirsearch">' +
         '<div class="th-field" style="margin-bottom:0;"><label>Current Housing</label><div class="toggle-row">'+chipGroupHtml(CURRENT_HOUSING_OPTIONS, "currentHousing", d.currentHousing)+'</div></div>' +
       '</div>' : '') +
@@ -3161,6 +3622,20 @@ function averageRating(list){
   var sum = rated.reduce(function(s,v){ return s+parseInt(v.detail.thisHome.rating,10); }, 0);
   return Math.round((sum/rated.length)*10)/10;
 }
+/* Neighbor Home Value Follow-Up — internal engagement counts only. Never surfaces names,
+   addresses, or any other personally-identifying detail; the Seller Report only ever reads
+   the aggregate potentialSellerLeads NUMBER from this (see buildWhatWeHeardSummary). */
+function neighborStats(list){
+  var neighbors = list.filter(function(v){ return v.contactType==="neighbor"; });
+  var valuationRequests = neighbors.filter(function(v){ return v.detail.homeValuationRequested; });
+  return {
+    visitors: neighbors.length,
+    valuationRequests: valuationRequests.length,
+    /* Every neighbor who requested a valuation is, by definition, a potential seller
+       opportunity — this doesn't force them into "seller" as their only contact type. */
+    potentialSellerLeads: valuationRequests.length
+  };
+}
 function openHouseThisHomeStats(oh){
   var list = visitorsFor(oh.id);
   var gv = openHouseGroupsAndVisitors(list);
@@ -3174,7 +3649,8 @@ function openHouseThisHomeStats(oh){
     liked: tallyOptions(list, function(v){ return v.detail.thisHome.liked; }),
     concerns: tallyOptions(list, function(v){ return v.detail.dealBreakers.selected; }),
     priceReaction: tallyOptions(list, function(v){ return v.detail.thisHome.priceReaction; }),
-    fit: tallyOptions(list, function(v){ return v.detail.thisHome.fit; })
+    fit: tallyOptions(list, function(v){ return v.detail.thisHome.fit; }),
+    neighbor: neighborStats(list)
   };
 }
 /* Internal-only — surfaces names, so this is never used on the Seller Report. */
@@ -3213,6 +3689,10 @@ function buildWhatWeHeardSummary(stats){
   }
   var yesEntry = stats.wouldConsiderOffer.find(function(i){ return i.label==="Yes"; });
   if(yesEntry && yesEntry.count) lines.push(yesEntry.count+" group"+(yesEntry.count===1?"":"s")+" indicated they would consider making an offer.");
+  /* Aggregate-only, seller-safe: a plain count, never names or addresses. */
+  if(stats.neighbor && stats.neighbor.potentialSellerLeads > 0){
+    lines.push(stats.neighbor.potentialSellerLeads+" potential seller opportunit"+(stats.neighbor.potentialSellerLeads===1?"y":"ies")+" generated.");
+  }
   return lines.join(" ");
 }
 function buildSellerReportPlainText(oh, stats, whatWeHeard){
@@ -3259,6 +3739,16 @@ function screenOpenHouseAnalytics(){
       '<div class="section-head"><h3>Concerns</h3></div><div class="card">'+distributionBarsHtml(stats.concerns)+'</div>' +
       '<div class="section-head"><h3>Price Reaction</h3></div><div class="card">'+distributionBarsHtml(stats.priceReaction)+'</div>' +
       '<div class="section-head"><h3>Overall Fit</h3></div><div class="card">'+distributionBarsHtml(stats.fit)+'</div>' +
+      /* Neighbor Home Value Follow-Up — internal counts only, never names/addresses. Hidden
+         entirely when no neighbors signed in, so it never clutters a typical open house. */
+      (stats.neighbor.visitors ? (
+        '<div class="section-head"><h3>Neighbor Engagement</h3></div>' +
+        '<div class="stat-grid">' +
+          '<div class="stat-tile"><div class="num">'+stats.neighbor.visitors+'</div><div class="lbl">Neighbor Visitors</div></div>' +
+          '<div class="stat-tile"><div class="num">'+stats.neighbor.valuationRequests+'</div><div class="lbl">Home Valuation Requests</div></div>' +
+          '<div class="stat-tile"><div class="num">'+stats.neighbor.potentialSellerLeads+'</div><div class="lbl">Potential Seller Leads</div></div>' +
+        '</div>'
+      ) : '') +
       '<div class="priority-card">' +
         '<div class="pc-tag">Internal Only</div>' +
         '<h3>Lead Opportunities ('+opportunities.length+')</h3>' +
@@ -3703,6 +4193,13 @@ var CONTENT_FIELD_REGISTRY = [
   {group:"Visitor Sign-In", path:"signin.submitButton", label:"Submit Button Label"},
   {group:"Confirmation Screens", path:"signin.confirmHeading", label:"Sign-In Confirmation Heading"},
   {group:"Confirmation Screens", path:"signin.confirmMessage", label:"Sign-In Confirmation Message (use {property})", multiline:true},
+  {group:"Neighbor Follow-Up", path:"signin.neighborHeading", label:"Neighbor Screen Heading"},
+  {group:"Neighbor Follow-Up", path:"signin.neighborSubtext", label:"Neighbor Screen Supporting Text", multiline:true},
+  {group:"Neighbor Follow-Up", path:"signin.neighborQuestion", label:"Neighbor Screen Question"},
+  {group:"Neighbor Follow-Up", path:"signin.neighborYesButton", label:'"Yes" Button Label'},
+  {group:"Neighbor Follow-Up", path:"signin.neighborNoButton", label:'"Not Right Now" Button Label'},
+  {group:"Neighbor Follow-Up", path:"signin.neighborAddressPlaceholder", label:"Home Address Field Placeholder"},
+  {group:"Neighbor Follow-Up", path:"signin.neighborAddressSubmitButton", label:"Address Submit Button Label"},
   {group:"Quick Add Visitor", path:"quickCapture.title", label:"Sheet Title"},
   {group:"Quick Add Visitor", path:"quickCapture.namePlaceholder", label:"Name Field Placeholder"},
   {group:"Quick Add Visitor", path:"quickCapture.emailPlaceholder", label:"Email Field Placeholder"},
@@ -3752,7 +4249,7 @@ var CONTENT_FIELD_REGISTRY = [
   {group:"Visitor Profile", path:"pages.visitorDetail.sectionFinancing", label:"Financing Section Title"},
   {group:"Visitor Profile", path:"pages.visitorDetail.sectionFamily", label:"Family Section Title"},
   {group:"Visitor Profile", path:"pages.visitorDetail.sectionPets", label:"Pets Section Title"},
-  {group:"Visitor Profile", path:"pages.visitorDetail.sectionDealBreakers", label:"Deal Breakers Section Title"},
+  {group:"Visitor Profile", path:"pages.visitorDetail.sectionDealBreakers", label:"Concerns Section Title"},
   {group:"Visitor Profile", path:"pages.visitorDetail.sectionFollowUp", label:"Follow-Up Section Title"},
   {group:"Visitor Profile", path:"pages.visitorDetail.sectionConnectionSummary", label:"Connection Summary Section Title"},
   {group:"Visitor Profile", path:"pages.visitorDetail.sectionTasks", label:"Tasks Section Title"},
@@ -4367,6 +4864,7 @@ function mountRoute(){
   if(route.name==="snapshotDetail"){ mountSnapshotDetail(); }
   if(route.name==="sellerReport"){ mountSellerReport(); }
   if(route.name==="signin" && (route.params.phase||"form")==="form"){ mountSignIn(); }
+  if(route.name==="signin" && route.params.phase==="neighborOffer"){ mountNeighborOffer(); }
   if(route.name==="settings"){ mountSettings(); }
 }
 
@@ -4572,6 +5070,21 @@ function mountVisitorDetail(){
   if(singleStoryEl){
     singleStoryEl.addEventListener("change", function(){
       d.singleStoryRequired = singleStoryEl.checked; saveState(); flashAutosave();
+    });
+  }
+
+  /* Neighbor Home Value Follow-Up — lets an agent flag/unflag this by hand too (e.g. a
+     Neighbor captured via Quick Capture rather than the kiosk). Triggers a full rerender
+     since the "Home Valuation Requested" pill and Next Action line are conditionally
+     rendered, not just class-toggled. */
+  var valuationEl = container.querySelector("#home-valuation-requested");
+  if(valuationEl){
+    valuationEl.addEventListener("change", function(){
+      d.homeValuationRequested = valuationEl.checked;
+      if(d.homeValuationRequested && !d.followUp.nextAction) d.followUp.nextAction = "Prepare Market Analysis";
+      saveState(); flashAutosave();
+      appEl.removeEventListener("click", globalClickHandler);
+      render();
     });
   }
 
