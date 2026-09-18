@@ -518,11 +518,26 @@ hr.hair{ border:none; border-top:1px solid var(--line-soft); margin: 18px 0; }
 }
 
 /* ---------- Neighbor Home Value Follow-Up (one extra sign-in phase, Neighbors only) ----------
-   Deliberately introduces NO new visual style — this phase reuses .signin-screen/.signin-intro/
-   .section-head/.card/.toggle-row/.chip/.field/.btn-primary exactly as the main sign-in form
-   does, so it reads as step 2 of the same form rather than a separate screen. The only new rule
-   here is the smooth-reveal transition for the conditional address block, which has no existing
-   equivalent elsewhere in the app. */
+   Reuses .signin-screen/.section-head/.card/.toggle-row/.chip/.field/.btn-primary exactly as the
+   main sign-in form so it reads as step 2 of the same form. Two small scoped pieces below are
+   intentionally NOT the shared .kicker-row/.signin-intro: this screen's property-context line
+   and heading are deliberately more compact/quiet than the main form's (a tighter "editorial"
+   intro instead of a second full-size hero heading), while still using the same font tokens
+   (--serif/--sans), colors and centering — this never touches the main form's own heading. */
+.neighbor-context{
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  color: var(--ink-soft); font-size:13px; font-weight:600; margin: 2px 0 20px;
+}
+.neighbor-context svg{ width:13px; height:13px; flex:none; opacity:.7; }
+.neighbor-heading-wrap{ text-align:center; margin: 0 0 26px; }
+.neighbor-heading-wrap h1{
+  font-family: var(--serif); font-weight:700; letter-spacing:-0.02em; color: var(--ink);
+  font-size:20px; line-height:1.3; max-width:300px; margin:0 auto 8px;
+}
+.neighbor-heading-wrap p{
+  color: var(--ink-soft); font-weight:400; font-size:14.5px; line-height:1.55;
+  max-width:270px; margin:0 auto;
+}
 .neighbor-address-reveal{
   max-height:0; opacity:0; overflow:hidden;
   transition: max-height .4s var(--ease), opacity .3s var(--ease), margin-top .4s var(--ease);
@@ -2660,12 +2675,16 @@ function screenSignIn(){
       heroHtml +
       '<div style="padding-top:'+(hasPhoto?'0':'36px')+';">'+brandline+'</div>' +
       '<div class="content">' +
-        '<div class="kicker-row" style="justify-content:center;margin-bottom:22px;">' +
-          '<span class="pulse-dot"></span>'+esc(propertyOneLine(oh)) +
-        '</div>' +
-        '<div class="signin-intro">' +
+        /* A very thin, neutral divider marks the transition from the shared hero into the
+           neighbor-specific content — the one subtle visual cue, nothing heavier. */
+        '<hr class="hair" style="margin:14px 0 18px;">' +
+        /* Compact, understated property recap — no "live" pulse-dot here, since there is no
+           visitor-facing status to communicate on this screen; just the same active property
+           data already shown one step ago. */
+        '<div class="neighbor-context">'+ICONS.home+'<span>'+esc(propertyOneLine(oh))+'</span></div>' +
+        '<div class="neighbor-heading-wrap">' +
           '<h1>'+esc(cfg("signin.neighborHeading"))+'</h1>' +
-          '<p class="signin-welcome">'+esc(cfg("signin.neighborSubtext"))+'</p>' +
+          '<p>'+esc(cfg("signin.neighborSubtext"))+'</p>' +
         '</div>' +
         '<div class="section-head"><h3>'+esc(cfg("signin.neighborCardTitle"))+'</h3></div>' +
         '<div class="card">' +
@@ -2675,13 +2694,16 @@ function screenSignIn(){
             '<button type="button" class="chip" id="n-no">'+esc(cfg("signin.neighborNoButton"))+'</button>' +
           '</div>' +
           /* Address + Submit live INSIDE this same card, revealed only after "Yes" — never a
-             second card, so the question/choice/address read as one continuous form. */
+             second card, so the question/choice/address/Submit read as one continuous form.
+             Submit is always rendered (not display:none) once revealed, starting disabled —
+             reusing the existing .btn[disabled] treatment — so it's never mistaken for missing;
+             it simply enables once the visitor has entered an address. */
           '<div class="neighbor-address-reveal" id="n-address-reveal">' +
             '<div class="field autocomplete-wrap" style="margin-top:20px;margin-bottom:0;">' +
               '<label>Home Address</label>' +
               '<input type="text" id="n-address" placeholder="'+esc(cfg("signin.neighborAddressPlaceholder"))+'" autocomplete="off">' +
             '</div>' +
-            '<button type="button" class="btn btn-primary" id="n-address-submit" style="width:100%;margin-top:16px;display:none;">'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
+            '<button type="button" class="btn btn-primary" id="n-address-submit" style="width:100%;margin-top:16px;" disabled>'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -2820,13 +2842,13 @@ function mountNeighborOffer(){
   var addressEl = document.querySelector("#n-address");
   var addressSubmitBtn = document.querySelector("#n-address-submit");
 
-  /* Submit only ever appears once BOTH "Yes" is selected (the reveal is showing) AND there is
-     text in the address field — never a moment where it's visible with nothing to submit. */
+  /* Submit is always rendered once the address block is revealed (never display:none, so it's
+     never mistaken for missing) — it just starts disabled via the existing .btn[disabled]
+     treatment, and enables the moment there is text in the address field. */
   function updateSubmitVisibility(){
     if(!addressSubmitBtn) return;
     var hasText = !!(addressEl && addressEl.value.trim());
-    var revealed = !!(reveal && reveal.classList.contains("show"));
-    addressSubmitBtn.style.display = (hasText && revealed) ? "flex" : "none";
+    addressSubmitBtn.disabled = !hasText;
   }
 
   if(yesBtn){
@@ -2857,6 +2879,7 @@ function mountNeighborOffer(){
   }
   if(addressSubmitBtn){
     addressSubmitBtn.addEventListener("click", function(){
+      if(addressSubmitBtn.disabled) return;
       var address = addressEl ? addressEl.value.trim() : "";
       if(!address){ if(addressEl) addressEl.focus(); toast("Enter your property address"); return; }
       /* Reuses this visitor's existing record — never creates a second one. Source stays
