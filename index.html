@@ -517,16 +517,17 @@ hr.hair{ border:none; border-top:1px solid var(--line-soft); margin: 18px 0; }
   display:flex; align-items:center; justify-content:center; box-shadow: var(--shadow-2);
 }
 
-/* ---------- Neighbor Home Value Follow-Up (one extra sign-in phase, Neighbors only) ---------- */
-.neighbor-offer-wrap{ max-width:360px; width:100%; }
-.neighbor-question{ font-size:16px; font-weight:600; color: var(--ink); margin-top:24px; margin-bottom:16px; }
-.neighbor-yn-row{ width:100%; gap:10px; }
-.neighbor-yn-btn{ padding:17px 14px; font-size:15.5px; }
+/* ---------- Neighbor Home Value Follow-Up (one extra sign-in phase, Neighbors only) ----------
+   Deliberately introduces NO new visual style — this phase reuses .signin-screen/.signin-intro/
+   .section-head/.card/.toggle-row/.chip/.field/.btn-primary exactly as the main sign-in form
+   does, so it reads as step 2 of the same form rather than a separate screen. The only new rule
+   here is the smooth-reveal transition for the conditional address block, which has no existing
+   equivalent elsewhere in the app. */
 .neighbor-address-reveal{
-  width:100%; max-height:0; opacity:0; overflow:hidden;
+  max-height:0; opacity:0; overflow:hidden;
   transition: max-height .4s var(--ease), opacity .3s var(--ease), margin-top .4s var(--ease);
 }
-.neighbor-address-reveal.show{ max-height:220px; opacity:1; margin-top:20px; }
+.neighbor-address-reveal.show{ max-height:260px; opacity:1; margin-top:14px; }
 
 /* ---------- Address autocomplete ---------- */
 .autocomplete-wrap{ position:relative; }
@@ -2638,26 +2639,38 @@ function screenSignIn(){
      at sign-in, between their form submission and the normal thank-you/confirm screen.
      Kept as one extra phase of the same "signin" route (not a separate route) so it reuses
      the exact same visitor record via route.params.visitorId — no new record is ever created
-     here, and every other visitor type never sees this phase at all. */
+     here, and every other visitor type never sees this phase at all.
+
+     Visually this is built from the EXACT same page anatomy as the main sign-in form below
+     (brandline -> .content -> .signin-intro -> .section-head/.card blocks -> primary CTA ->
+     kiosk-home-btn) rather than the celebratory full-height "confirm" hero style, so it reads
+     as step 2 of one continuous form instead of a separate screen. */
   if(phase === "neighborOffer"){
     return '<div class="screen signin-screen">' +
-      '<div class="signin-confirm-wrap neighbor-offer-wrap">' +
-        '<div class="glyph-ring">'+ICONS.home+'</div>' +
-        '<h1>'+esc(cfg("signin.neighborHeading"))+'</h1>' +
-        '<p>'+esc(cfg("signin.neighborSubtext"))+'</p>' +
-        '<div class="neighbor-question">'+esc(cfg("signin.neighborQuestion"))+'</div>' +
-        '<div class="toggle-row neighbor-yn-row">' +
-          '<button type="button" class="chip neighbor-yn-btn" id="n-yes">'+esc(cfg("signin.neighborYesButton"))+'</button>' +
-          '<button type="button" class="chip neighbor-yn-btn" id="n-no">'+esc(cfg("signin.neighborNoButton"))+'</button>' +
+      '<div style="padding-top:36px;">'+brandline+'</div>' +
+      '<div class="content">' +
+        '<div class="signin-intro">' +
+          '<h1>'+esc(cfg("signin.neighborHeading"))+'</h1>' +
+          '<p class="signin-welcome">'+esc(cfg("signin.neighborSubtext"))+'</p>' +
+        '</div>' +
+        '<div class="section-head"><h3>'+esc(cfg("signin.neighborQuestion"))+'</h3></div>' +
+        '<div class="card">' +
+          '<div class="toggle-row" id="n-yn">' +
+            '<button type="button" class="chip" id="n-yes">'+esc(cfg("signin.neighborYesButton"))+'</button>' +
+            '<button type="button" class="chip" id="n-no">'+esc(cfg("signin.neighborNoButton"))+'</button>' +
+          '</div>' +
         '</div>' +
         '<div class="neighbor-address-reveal" id="n-address-reveal">' +
-          '<div class="field" style="text-align:left;margin-top:4px;">' +
-            '<label>Home Address</label>' +
-            '<input type="text" id="n-address" placeholder="'+esc(cfg("signin.neighborAddressPlaceholder"))+'" autocomplete="off">' +
+          '<div class="card">' +
+            '<div class="field" style="margin-bottom:0;">' +
+              '<label>Home Address</label>' +
+              '<input type="text" id="n-address" placeholder="'+esc(cfg("signin.neighborAddressPlaceholder"))+'" autocomplete="off">' +
+            '</div>' +
           '</div>' +
-          '<button type="button" class="btn btn-primary" id="n-address-submit" style="width:100%;">'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
+          '<button type="button" class="btn btn-primary" id="n-address-submit" style="margin-top:14px;">'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
         '</div>' +
       '</div>' +
+      '<button class="kiosk-home-btn" data-action="openViewMenu" aria-label="Return to Admin">'+ICONS.home+'</button>' +
       '</div>';
   }
 
