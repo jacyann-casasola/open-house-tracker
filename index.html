@@ -119,6 +119,8 @@ input,textarea,select{ font-family: inherit; }
 .btn-secondary{ background: var(--paper); color: var(--ink); border:1px solid var(--line); }
 .btn-ghost{ background:transparent; color: var(--ink-soft); }
 .btn-danger-ghost{ background:transparent; color: var(--danger); }
+.btn-danger{ background: var(--danger); color:#fff; box-shadow: var(--shadow-2); }
+.btn-danger:active{ box-shadow: var(--shadow-1); }
 .btn-sm{ padding:10px 18px; font-size:14px; width:auto; }
 .btn[disabled]{ opacity:.35; pointer-events:none; }
 .btn-row{ display:flex; gap:12px; }
@@ -608,6 +610,27 @@ hr.hair{ border:none; border-top:1px solid var(--line-soft); margin: 18px 0; }
 .logo-placeholder{ width:56px; height:56px; border-radius:50%; background: var(--mist-deep); display:flex; align-items:center; justify-content:center; color: var(--ink-faint); flex:none; }
 .file-btn-wrap{ position:relative; overflow:hidden; display:inline-block; }
 .file-btn-wrap input[type=file]{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+.file-btn-wrap input[type=file][disabled]{ pointer-events:none; }
+
+/* ---------- Property Photo management (Edit Property sheet) ---------- */
+.photo-manage-preview{
+  width:100%; height:140px; border-radius: var(--r-sm); overflow:hidden; background: var(--mist-deep);
+  margin-bottom:12px; display:flex; align-items:center; justify-content:center;
+}
+.photo-manage-preview img{ width:100%; height:100%; object-fit:cover; display:block; }
+.photo-manage-controls{ display:flex; gap:8px; flex-wrap:wrap; }
+.photo-manage-status{
+  font-size:12.5px; margin-top:10px; min-height:16px; color: var(--ink-soft);
+  display:flex; align-items:center; gap:7px; line-height:1.4;
+}
+.photo-manage-status.error{ color: var(--danger); }
+.photo-manage-status.success{ color: var(--success); }
+.photo-spinner{
+  width:12px; height:12px; border-radius:50%; flex:none;
+  border:2px solid var(--line); border-top-color: var(--ink-soft);
+  animation: photo-spin .7s linear infinite;
+}
+@keyframes photo-spin{ to{ transform: rotate(360deg); } }
 .optlist-caption{ font-size:12px; color: var(--ink-faint); margin-bottom:12px; line-height:1.5; }
 .signin-brand-ring img, .welcome-logo img{ width:100%; height:100%; border-radius:50%; object-fit:cover; display:block; }
 .welcome-logo{ width:40px; height:40px; border-radius:50%; margin:0 auto 10px; overflow:hidden; }
@@ -1743,8 +1766,15 @@ migrateState();
 applyBrandStyles();
 
 function saveState(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  /* Returns true/false so callers that need real confirmation (e.g. the property photo
+     upload flow) can tell an actual persisted save apart from a silently-dropped one — most
+     existing callers ignore this return value entirely, which is unaffected. A write can fail
+     here if the JSON (most often a large embedded photo) exceeds the browser's localStorage
+     quota; previously that failure was swallowed with no feedback anywhere in the app. */
+  var ok = true;
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ ok = false; }
   if(typeof Sync !== "undefined" && Sync && Sync.push) Sync.push();
+  return ok;
 }
 saveState();
 
@@ -2424,17 +2454,70 @@ function sheetCreateOpenHouse(){
   });
 }
 
+/* Property Photo — this IS the one persistent source of truth for the open house's photo
+   (state.openHouses[oh.id].photoDataUrl), already saved via the same saveState() pipeline
+   (localStorage + optional Firebase sync) as every other field on this record. Sign-In,
+   the Neighbor screen, and this preview all read oh.photoDataUrl directly — there is no
+   separate upload per screen. This markup only renders the CURRENT saved state (preview,
+   Replace/Remove); all Uploading/Saved/Error feedback is injected live by the JS below. */
 function propertyPhotoFieldHtml(oh){
-  return '<div class="field" style="margin-bottom:22px;"><label>Sign-In Photo</label>' +
-    '<div class="logo-preview-wrap">' +
-      (oh.photoDataUrl
-        ? '<img class="logo-preview" style="width:72px;height:56px;border-radius:12px;" src="'+esc(oh.photoDataUrl)+'" alt="">'
-        : '<div class="logo-placeholder" style="width:72px;height:56px;border-radius:12px;">'+ICONS.home+'</div>') +
-      '<div class="file-btn-wrap"><button type="button" class="btn btn-secondary btn-sm">Upload</button><input type="file" id="f-photo-file" accept="image/*"></div>' +
-      (oh.photoDataUrl ? '<button type="button" class="btn btn-ghost btn-sm" id="f-photo-remove">Remove</button>' : '') +
+  var hasPhoto = !!oh.photoDataUrl;
+  return '<div class="field" style="margin-bottom:22px;"><label>Property Photo</label>' +
+    '<div class="photo-manage-preview" id="photo-manage-preview">' +
+      (hasPhoto
+        ? '<img id="photo-preview-img" src="'+esc(oh.photoDataUrl)+'" alt="">'
+        : ICONS.home) +
     '</div>' +
-    '<div class="settings-help">Shown at the top of the Visitor Sign-In screen, fading gently into the page below.</div>' +
+    '<div class="photo-manage-controls">' +
+      '<div class="file-btn-wrap"><button type="button" class="btn btn-secondary btn-sm" id="photo-upload-label">'+(hasPhoto?"Replace Photo":"Upload Photo")+'</button><input type="file" id="f-photo-file" accept="image/*"></div>' +
+      (hasPhoto ? '<button type="button" class="btn btn-danger-ghost btn-sm" id="f-photo-remove">Remove Photo</button>' : '') +
+    '</div>' +
+    '<div class="photo-manage-status" id="photo-manage-status"></div>' +
+    '<div class="settings-help">Shown at the top of the Visitor Sign-In and Neighbor screens, fading gently into the page below. Saved once to this Open House Event — you won\'t need to re-upload it each time you return.</div>' +
   '</div>';
+}
+/* Reads the file, downscales it (max 1600px on the long edge) and re-encodes it as a
+   compressed JPEG via an offscreen canvas so the resulting base64 string is small enough to
+   reliably fit in localStorage and sync quickly — full-resolution phone photos, once base64
+   encoded, can easily exceed the browser's per-origin storage quota, which is what was
+   silently failing before (see saveState()). Never rejects on a compression problem: if the
+   image can't be decoded/drawn (or this runs somewhere without canvas support), it resolves
+   with the original uncompressed data instead of blocking the upload. Only resolves null if
+   the file itself couldn't be read at all. */
+function compressPhotoForStorage(file){
+  return new Promise(function(resolve){
+    var reader = new FileReader();
+    reader.onerror = function(){ resolve(null); };
+    reader.onload = function(){
+      var rawDataUrl = String(reader.result || "");
+      if(!rawDataUrl){ resolve(null); return; }
+      var settled = false;
+      function settle(v){ if(settled) return; settled = true; resolve(v); }
+      var safetyTimer = setTimeout(function(){ settle(rawDataUrl); }, 1500);
+      try{
+        var img = new Image();
+        img.onerror = function(){ clearTimeout(safetyTimer); settle(rawDataUrl); };
+        img.onload = function(){
+          clearTimeout(safetyTimer);
+          try{
+            var maxDim = 1600;
+            var iw = img.naturalWidth || img.width || maxDim, ih = img.naturalHeight || img.height || maxDim;
+            var scale = Math.min(1, maxDim / Math.max(iw, ih));
+            var w = Math.max(1, Math.round(iw * scale)), h = Math.max(1, Math.round(ih * scale));
+            var canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            var ctx = canvas.getContext && canvas.getContext("2d");
+            if(!ctx){ settle(rawDataUrl); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+            var compressed = canvas.toDataURL("image/jpeg", 0.82);
+            settle((compressed && compressed.length < rawDataUrl.length) ? compressed : rawDataUrl);
+          }catch(e){ settle(rawDataUrl); }
+        };
+        img.src = rawDataUrl;
+      }catch(e){ clearTimeout(safetyTimer); settle(rawDataUrl); }
+    };
+    reader.readAsDataURL(file);
+  });
 }
 function sheetEditProperty(oh){
   var body =
@@ -2446,30 +2529,99 @@ function sheetEditProperty(oh){
     sheet.querySelector("[data-sheet-close]").addEventListener("click", close);
     bindCurrencyInput(sheet.querySelector("#f-price"), oh.price);
     attachAddressAutocomplete(sheet, "f");
+
     var photoFileInput = sheet.querySelector("#f-photo-file");
-    if(photoFileInput){
-      photoFileInput.addEventListener("change", function(){
-        var file = photoFileInput.files && photoFileInput.files[0];
-        if(!file) return;
-        var reader = new FileReader();
-        reader.onload = function(){
-          oh.photoDataUrl = String(reader.result||"");
-          saveState(); flashAutosave(); close();
-          appEl.removeEventListener("click", globalClickHandler);
-          render();
-        };
-        reader.readAsDataURL(file);
-      });
+    var photoStatusEl = sheet.querySelector("#photo-manage-status");
+    var photoUploading = false;
+
+    function setPhotoStatus(kind, text){
+      if(!photoStatusEl) return;
+      photoStatusEl.className = "photo-manage-status" + (kind ? " "+kind : "");
+      photoStatusEl.innerHTML = (kind==="uploading" ? '<span class="photo-spinner"></span>' : '') + esc(text||"");
     }
-    var photoRemoveBtn = sheet.querySelector("#f-photo-remove");
-    if(photoRemoveBtn){
-      photoRemoveBtn.addEventListener("click", function(){
-        oh.photoDataUrl = "";
-        saveState(); flashAutosave(); close();
+    function refreshPhotoUI(){
+      var previewWrap = sheet.querySelector("#photo-manage-preview");
+      if(previewWrap) previewWrap.innerHTML = oh.photoDataUrl ? ('<img id="photo-preview-img" src="'+esc(oh.photoDataUrl)+'" alt="">') : ICONS.home;
+      var uploadLabel = sheet.querySelector("#photo-upload-label");
+      if(uploadLabel) uploadLabel.textContent = oh.photoDataUrl ? "Replace Photo" : "Upload Photo";
+      var controlsWrap = sheet.querySelector(".photo-manage-controls");
+      var existingRemoveBtn = sheet.querySelector("#f-photo-remove");
+      if(oh.photoDataUrl && !existingRemoveBtn && controlsWrap){
+        var btn = document.createElement("button");
+        btn.type = "button"; btn.className = "btn btn-danger-ghost btn-sm"; btn.id = "f-photo-remove";
+        btn.textContent = "Remove Photo";
+        controlsWrap.appendChild(btn);
+        wireRemoveButton(btn);
+      }else if(!oh.photoDataUrl && existingRemoveBtn){
+        existingRemoveBtn.remove();
+      }
+    }
+
+    function handlePhotoFile(file){
+      /* Guards against a second upload firing while the first is still processing/saving —
+         the file input is also disabled below for the same reason. */
+      if(photoUploading) return;
+      photoUploading = true;
+      if(photoFileInput) photoFileInput.disabled = true;
+      setPhotoStatus("uploading", "Uploading photo…");
+      var previousPhoto = oh.photoDataUrl;
+      compressPhotoForStorage(file).then(function(dataUrl){
+        photoUploading = false;
+        if(photoFileInput){ photoFileInput.disabled = false; photoFileInput.value = ""; }
+        if(!dataUrl){
+          setPhotoStatus("error", "Couldn't read that photo — try again.");
+          return;
+        }
+        oh.photoDataUrl = dataUrl;
+        var persisted = saveState();
+        if(!persisted){
+          /* Keep the previously saved photo — never leave an unsaved, temporary reference
+             in place and call it done. */
+          oh.photoDataUrl = previousPhoto;
+          setPhotoStatus("error", "Couldn't save photo — it may be too large. Try again or use a smaller image.");
+          return;
+        }
+        refreshPhotoUI();
+        setPhotoStatus("success", "Photo saved");
         appEl.removeEventListener("click", globalClickHandler);
         render();
       });
     }
+    if(photoFileInput){
+      photoFileInput.addEventListener("change", function(){
+        var file = photoFileInput.files && photoFileInput.files[0];
+        if(!file) return;
+        handlePhotoFile(file);
+      });
+    }
+
+    function wireRemoveButton(btn){
+      btn.addEventListener("click", function(){
+        var confirmBody =
+          '<div class="sheet-head"><h3>Remove this property photo?</h3><button class="sheet-close" data-sheet-close>'+ICONS.close+'</button></div>' +
+          '<div class="sheet-body"><p style="font-size:14px;color:var(--ink-soft);line-height:1.6;">This photo will no longer appear on the visitor-facing pages for this open house.</p></div>' +
+          '<div class="sheet-footer"><div class="btn-row">' +
+            '<button class="btn btn-secondary" data-sheet-cancel>Cancel</button>' +
+            '<button class="btn btn-danger" id="confirm-remove-photo">Remove</button>' +
+          '</div></div>';
+        openSheet(confirmBody, function(csheet, cclose){
+          csheet.querySelector("[data-sheet-close]").addEventListener("click", cclose);
+          csheet.querySelector("[data-sheet-cancel]").addEventListener("click", cclose);
+          csheet.querySelector("#confirm-remove-photo").addEventListener("click", function(){
+            oh.photoDataUrl = "";
+            saveState();
+            cclose();
+            refreshPhotoUI();
+            setPhotoStatus("", "Photo removed");
+            appEl.removeEventListener("click", globalClickHandler);
+            render();
+          });
+        });
+      });
+    }
+    var photoRemoveBtn = sheet.querySelector("#f-photo-remove");
+    if(photoRemoveBtn) wireRemoveButton(photoRemoveBtn);
+
     sheet.querySelector("#btn-save-oh").addEventListener("click", function(){
       oh.address = sheet.querySelector("#f-address").value.trim();
       oh.city = sheet.querySelector("#f-city").value.trim();
@@ -2693,18 +2845,18 @@ function screenSignIn(){
             '<button type="button" class="chip" id="n-yes">'+esc(cfg("signin.neighborYesButton"))+'</button>' +
             '<button type="button" class="chip" id="n-no">'+esc(cfg("signin.neighborNoButton"))+'</button>' +
           '</div>' +
-          /* Address + Submit live INSIDE this same card, revealed only after "Yes" — never a
-             second card, so the question/choice/address/Submit read as one continuous form.
-             Submit is always rendered (not display:none) once revealed, starting disabled —
-             reusing the existing .btn[disabled] treatment — so it's never mistaken for missing;
-             it simply enables once the visitor has entered an address. */
+          /* Address lives INSIDE this same card, revealed only after "Yes" — never a second
+             card. Submit is a SEPARATE element rendered after the (possibly collapsed) reveal,
+             not inside it — it is ALWAYS present for both Yes and No, and is the only action
+             that ever commits/navigates. Choosing Yes or No only changes selection/visibility;
+             it never submits, saves, or advances the screen by itself. */
           '<div class="neighbor-address-reveal" id="n-address-reveal">' +
             '<div class="field autocomplete-wrap" style="margin-top:20px;margin-bottom:0;">' +
               '<label>Home Address</label>' +
               '<input type="text" id="n-address" placeholder="'+esc(cfg("signin.neighborAddressPlaceholder"))+'" autocomplete="off">' +
             '</div>' +
-            '<button type="button" class="btn btn-primary" id="n-address-submit" style="width:100%;margin-top:16px;" disabled>'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
           '</div>' +
+          '<button type="button" class="btn btn-primary" id="n-submit" style="width:100%;margin-top:16px;" disabled>'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
         '</div>' +
       '</div>' +
       '<button class="kiosk-home-btn" data-action="openViewMenu" aria-label="Return to Admin">'+ICONS.home+'</button>' +
@@ -2840,56 +2992,72 @@ function mountNeighborOffer(){
   var noBtn = document.querySelector("#n-no");
   var reveal = document.querySelector("#n-address-reveal");
   var addressEl = document.querySelector("#n-address");
-  var addressSubmitBtn = document.querySelector("#n-address-submit");
+  var submitBtn = document.querySelector("#n-submit");
 
-  /* Submit is always rendered once the address block is revealed (never display:none, so it's
-     never mistaken for missing) — it just starts disabled via the existing .btn[disabled]
-     treatment, and enables the moment there is text in the address field. */
-  function updateSubmitVisibility(){
-    if(!addressSubmitBtn) return;
-    var hasText = !!(addressEl && addressEl.value.trim());
-    addressSubmitBtn.disabled = !hasText;
+  /* Yes/No ONLY ever set which option is selected and toggle the address field's visibility —
+     neither one saves anything or navigates anywhere. Submit is the one and only action that
+     commits the response and advances the screen, so this variable (not a save write) is the
+     single source of truth for what a later Submit press should do. */
+  var selection = null; /* null | "yes" | "no" */
+
+  function updateSubmitState(){
+    if(!submitBtn) return;
+    if(selection === "yes"){
+      submitBtn.disabled = !(addressEl && addressEl.value.trim());
+    }else if(selection === "no"){
+      submitBtn.disabled = false;
+    }else{
+      submitBtn.disabled = true;
+    }
   }
 
   if(yesBtn){
     yesBtn.addEventListener("click", function(){
+      selection = "yes";
       yesBtn.classList.add("selected");
       if(noBtn) noBtn.classList.remove("selected");
       if(reveal){
         reveal.classList.add("show");
         setTimeout(function(){ if(addressEl) addressEl.focus(); }, 350);
       }
-      updateSubmitVisibility();
+      updateSubmitState();
     });
   }
   if(noBtn){
     noBtn.addEventListener("click", function(){
-      /* Declining is not a negative lead status — just skip straight to the existing
-         completion experience with nothing further asked. */
+      selection = "no";
       noBtn.classList.add("selected");
       if(yesBtn) yesBtn.classList.remove("selected");
-      goToConfirm();
+      /* Hides the address field, but deliberately does NOT clear its value — if the visitor
+         switches back to Yes later in this same session, whatever they'd started typing is
+         still there, exactly as requested. */
+      if(reveal) reveal.classList.remove("show");
+      updateSubmitState();
     });
   }
   if(addressEl){
-    addressEl.addEventListener("input", updateSubmitVisibility);
+    addressEl.addEventListener("input", updateSubmitState);
     /* Address autocomplete/typeahead — see attachNeighborAddressAutocomplete() below. Manual
        typing always keeps working even if suggestions fail to load (offline, blocked, etc). */
     attachNeighborAddressAutocomplete(addressEl, nv.openHouseId ? state.openHouses.find(function(o){ return o.id===nv.openHouseId; }) : activeOpenHouse());
   }
-  if(addressSubmitBtn){
-    addressSubmitBtn.addEventListener("click", function(){
-      if(addressSubmitBtn.disabled) return;
-      var address = addressEl ? addressEl.value.trim() : "";
-      if(!address){ if(addressEl) addressEl.focus(); toast("Enter your property address"); return; }
-      /* Reuses this visitor's existing record — never creates a second one. Source stays
-         whatever it already was (the current Open House), contact type/priority is left as
-         the auto-detected "Neighbor" (see CONTACT_TYPE_AUTO_MAP), so this person can still
-         separately be tracked as a potential buyer/seller without being forced into one
-         category. */
-      d.homeAddress = address;
-      d.homeValuationRequested = true;
-      if(!d.followUp.nextAction) d.followUp.nextAction = "Prepare Market Analysis";
+  if(submitBtn){
+    submitBtn.addEventListener("click", function(){
+      if(submitBtn.disabled) return;
+      if(selection === "yes"){
+        var address = addressEl ? addressEl.value.trim() : "";
+        if(!address){ if(addressEl) addressEl.focus(); toast("Enter your property address"); return; }
+        /* Reuses this visitor's existing record — never creates a second one. Source stays
+           whatever it already was (the current Open House), contact type/priority is left as
+           the auto-detected "Neighbor" (see CONTACT_TYPE_AUTO_MAP), so this person can still
+           separately be tracked as a potential buyer/seller without being forced into one
+           category. */
+        d.homeAddress = address;
+        d.homeValuationRequested = true;
+        if(!d.followUp.nextAction) d.followUp.nextAction = "Prepare Market Analysis";
+      }
+      /* selection === "no": intentionally writes nothing — no address, no valuation flag, no
+         follow-up action. Declining is not a negative lead status, just an explicit no-op. */
       saveState();
       goToConfirm();
     });
@@ -3719,7 +3887,48 @@ function screenVisitorDetail(){
       (status==="capture" ? '<div class="card" style="margin-top:12px;background:#fbf1de;border-color:#f0e0bd;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><div style="font-size:14px;color:#8a5a2a;font-weight:600;">'+esc(vdc.captureBannerText)+'</div><button class="btn btn-sm btn-primary" data-action="markNotesComplete" style="background:#8a5a2a;">'+esc(vdc.captureBannerButton)+'</button></div></div>' : '') +
 
       assembleSections("visitorDetail", vBlocks) +
+
+      /* Admin-only, deliberately understated — a visitor filling out the sign-in kiosk never
+         reaches this screen at all (it's only navigable from the admin Queue), so there is no
+         separate visibility check needed here beyond that existing routing boundary. Placed at
+         the very bottom, visually secondary (ghost/danger text, not a solid button), so it is
+         never confused with a normal in-conversation action. */
+      '<div style="display:flex;justify-content:center;margin-top:32px;padding-top:20px;border-top:1px solid var(--line-soft);">' +
+        '<button type="button" class="btn btn-danger-ghost btn-sm" data-action="deleteVisitor">Delete Visitor</button>' +
+      '</div>' +
     '</div></div>';
+}
+
+/* Delete Visitor — permanently removes this visitor record (contact info, This Home feedback,
+   Their Home Search criteria, follow-up, tasks, Home Valuation Request/address — everything
+   lives on this one record, see newVisitor()/migrateVisitorDetail(), so removing it is a single
+   array filter, not a multi-table cleanup) and nothing else. Since Analytics, the Seller
+   Report, Follow-Up, and every count on Workspace/Queue are all computed live from
+   state.visitors on every render (see visitorsFor()/openHouseThisHomeStats()/etc.) rather than
+   cached anywhere, they reflect the deletion immediately with no separate recalculation step.
+   This is a hard delete, not a soft/archived flag — there is currently no "Contact" record
+   independent of a "Visit" in this app's data model (see newVisitor()), so a visitor's sign-in
+   record IS their only record for that open house; deleting it cannot orphan or corrupt a
+   separate contact, and it never touches state.openHouses or any other visitor. */
+function sheetConfirmDeleteVisitor(v){
+  var body =
+    '<div class="sheet-head"><h3>Delete this visitor?</h3><button class="sheet-close" data-sheet-close>'+ICONS.close+'</button></div>' +
+    '<div class="sheet-body"><p style="font-size:14px;color:var(--ink-soft);line-height:1.6;">This will permanently remove this visitor and their associated open house feedback, follow-up information, and tasks. This action cannot be undone.</p></div>' +
+    '<div class="sheet-footer"><div class="btn-row">' +
+      '<button class="btn btn-secondary" data-sheet-cancel>Cancel</button>' +
+      '<button class="btn btn-danger" id="confirm-delete-visitor">Delete Visitor</button>' +
+    '</div></div>';
+  openSheet(body, function(sheet, close){
+    sheet.querySelector("[data-sheet-close]").addEventListener("click", close);
+    sheet.querySelector("[data-sheet-cancel]").addEventListener("click", close);
+    sheet.querySelector("#confirm-delete-visitor").addEventListener("click", function(){
+      state.visitors = state.visitors.filter(function(x){ return x.id !== v.id; });
+      saveState();
+      close();
+      toast("Visitor deleted");
+      nav("queue");
+    });
+  });
 }
 
 function sheetEditContactType(v){
@@ -5094,6 +5303,7 @@ function handleAction(action, el){
     return;
   }
   if(action==="editContactType"){ var v3 = findVisitor(route.params.id); if(v3) sheetEditContactType(v3); return; }
+  if(action==="deleteVisitor"){ var v7 = findVisitor(route.params.id); if(v7) sheetConfirmDeleteVisitor(v7); return; }
   if(action==="openMultiSelect"){
     var v6 = findVisitor(route.params.id);
     var msKey = el.getAttribute("data-ms-key");
