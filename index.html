@@ -527,7 +527,9 @@ hr.hair{ border:none; border-top:1px solid var(--line-soft); margin: 18px 0; }
   max-height:0; opacity:0; overflow:hidden;
   transition: max-height .4s var(--ease), opacity .3s var(--ease), margin-top .4s var(--ease);
 }
-.neighbor-address-reveal.show{ max-height:260px; opacity:1; margin-top:14px; }
+/* overflow:visible once expanded — otherwise the address-autocomplete suggestions list
+   (which pops open below the input) would be clipped by this wrapper's own bounds. */
+.neighbor-address-reveal.show{ max-height:320px; opacity:1; margin-top:14px; overflow:visible; }
 
 /* ---------- Address autocomplete ---------- */
 .autocomplete-wrap{ position:relative; }
@@ -838,10 +840,11 @@ var CONTENT_DEFAULTS = {
        thank-you/confirm screen. */
     neighborHeading: "Curious what your home could be worth?",
     neighborSubtext: "I'd be happy to put together a complimentary market analysis for you.",
+    neighborCardTitle: "Complimentary Home Value",
     neighborQuestion: "Would you like a free market analysis of your home?",
     neighborYesButton: "Yes, please",
     neighborNoButton: "Not right now",
-    neighborAddressPlaceholder: "Enter your property address",
+    neighborAddressPlaceholder: "Start typing your address...",
     neighborAddressSubmitButton: "Submit"
   },
   quickCapture: {
@@ -2625,6 +2628,12 @@ function screenSignIn(){
       '</div>';
   }
 
+  /* Hero photo + hasPhoto are computed here (rather than down with the main form) so the
+     Neighbor phase below can reuse the EXACT same hero element, sourced from the same active
+     Open House record — never a separate/hardcoded image. */
+  var hasPhoto = !!oh.photoDataUrl;
+  var heroHtml = hasPhoto ? '<div class="signin-hero"><img src="'+esc(oh.photoDataUrl)+'" alt=""><div class="signin-hero-fade"></div></div>' : '';
+
   if(phase === "confirm"){
     return '<div class="screen signin-screen">' +
       '<div class="signin-confirm-wrap">' +
@@ -2641,33 +2650,39 @@ function screenSignIn(){
      the exact same visitor record via route.params.visitorId — no new record is ever created
      here, and every other visitor type never sees this phase at all.
 
-     Visually this is built from the EXACT same page anatomy as the main sign-in form below
-     (brandline -> .content -> .signin-intro -> .section-head/.card blocks -> primary CTA ->
-     kiosk-home-btn) rather than the celebratory full-height "confirm" hero style, so it reads
-     as step 2 of one continuous form instead of a separate screen. */
+     Visually this reuses the EXACT same hero/brandline/property-context elements as the main
+     sign-in form below (same heroHtml/hasPhoto/brandline variables, same oh record — so it
+     always tracks whichever open house is currently active, never a hardcoded image/address),
+     then a single .signin-intro + one .section-head/.card pair — the same "one intro, one
+     section" anatomy the main form uses per step — rather than several stacked containers. */
   if(phase === "neighborOffer"){
-    return '<div class="screen signin-screen">' +
-      '<div style="padding-top:36px;">'+brandline+'</div>' +
+    return '<div class="screen signin-screen'+(hasPhoto?' has-hero':'')+'">' +
+      heroHtml +
+      '<div style="padding-top:'+(hasPhoto?'0':'36px')+';">'+brandline+'</div>' +
       '<div class="content">' +
+        '<div class="kicker-row" style="justify-content:center;margin-bottom:22px;">' +
+          '<span class="pulse-dot"></span>'+esc(propertyOneLine(oh)) +
+        '</div>' +
         '<div class="signin-intro">' +
           '<h1>'+esc(cfg("signin.neighborHeading"))+'</h1>' +
           '<p class="signin-welcome">'+esc(cfg("signin.neighborSubtext"))+'</p>' +
         '</div>' +
-        '<div class="section-head"><h3>'+esc(cfg("signin.neighborQuestion"))+'</h3></div>' +
+        '<div class="section-head"><h3>'+esc(cfg("signin.neighborCardTitle"))+'</h3></div>' +
         '<div class="card">' +
+          '<div style="font-size:15.5px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:14px;">'+esc(cfg("signin.neighborQuestion"))+'</div>' +
           '<div class="toggle-row" id="n-yn">' +
             '<button type="button" class="chip" id="n-yes">'+esc(cfg("signin.neighborYesButton"))+'</button>' +
             '<button type="button" class="chip" id="n-no">'+esc(cfg("signin.neighborNoButton"))+'</button>' +
           '</div>' +
-        '</div>' +
-        '<div class="neighbor-address-reveal" id="n-address-reveal">' +
-          '<div class="card">' +
-            '<div class="field" style="margin-bottom:0;">' +
+          /* Address + Submit live INSIDE this same card, revealed only after "Yes" — never a
+             second card, so the question/choice/address read as one continuous form. */
+          '<div class="neighbor-address-reveal" id="n-address-reveal">' +
+            '<div class="field autocomplete-wrap" style="margin-top:20px;margin-bottom:0;">' +
               '<label>Home Address</label>' +
               '<input type="text" id="n-address" placeholder="'+esc(cfg("signin.neighborAddressPlaceholder"))+'" autocomplete="off">' +
             '</div>' +
+            '<button type="button" class="btn btn-primary" id="n-address-submit" style="width:100%;margin-top:16px;display:none;">'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
           '</div>' +
-          '<button type="button" class="btn btn-primary" id="n-address-submit" style="margin-top:14px;">'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
         '</div>' +
       '</div>' +
       '<button class="kiosk-home-btn" data-action="openViewMenu" aria-label="Return to Admin">'+ICONS.home+'</button>' +
@@ -2698,9 +2713,6 @@ function screenSignIn(){
         '<div class="optional-detail-wrap"><textarea class="optional-detail" id="s-purpose-other" placeholder="'+esc(cfg("signin.otherPlaceholder"))+'"></textarea></div>' +
       '</div>'
   };
-
-  var hasPhoto = !!oh.photoDataUrl;
-  var heroHtml = hasPhoto ? '<div class="signin-hero"><img src="'+esc(oh.photoDataUrl)+'" alt=""><div class="signin-hero-fade"></div></div>' : '';
 
   return '<div class="screen signin-screen'+(hasPhoto?' has-hero':'')+'">' +
     heroHtml +
@@ -2808,6 +2820,15 @@ function mountNeighborOffer(){
   var addressEl = document.querySelector("#n-address");
   var addressSubmitBtn = document.querySelector("#n-address-submit");
 
+  /* Submit only ever appears once BOTH "Yes" is selected (the reveal is showing) AND there is
+     text in the address field — never a moment where it's visible with nothing to submit. */
+  function updateSubmitVisibility(){
+    if(!addressSubmitBtn) return;
+    var hasText = !!(addressEl && addressEl.value.trim());
+    var revealed = !!(reveal && reveal.classList.contains("show"));
+    addressSubmitBtn.style.display = (hasText && revealed) ? "flex" : "none";
+  }
+
   if(yesBtn){
     yesBtn.addEventListener("click", function(){
       yesBtn.classList.add("selected");
@@ -2816,6 +2837,7 @@ function mountNeighborOffer(){
         reveal.classList.add("show");
         setTimeout(function(){ if(addressEl) addressEl.focus(); }, 350);
       }
+      updateSubmitVisibility();
     });
   }
   if(noBtn){
@@ -2826,6 +2848,12 @@ function mountNeighborOffer(){
       if(yesBtn) yesBtn.classList.remove("selected");
       goToConfirm();
     });
+  }
+  if(addressEl){
+    addressEl.addEventListener("input", updateSubmitVisibility);
+    /* Address autocomplete/typeahead — see attachNeighborAddressAutocomplete() below. Manual
+       typing always keeps working even if suggestions fail to load (offline, blocked, etc). */
+    attachNeighborAddressAutocomplete(addressEl, nv.openHouseId ? state.openHouses.find(function(o){ return o.id===nv.openHouseId; }) : activeOpenHouse());
   }
   if(addressSubmitBtn){
     addressSubmitBtn.addEventListener("click", function(){
@@ -2843,6 +2871,95 @@ function mountNeighborOffer(){
       goToConfirm();
     });
   }
+}
+
+/* Home Address autocomplete/typeahead for the Neighbor Home Value screen. Reuses the exact
+   same free, keyless provider (OpenStreetMap Nominatim) and .autocomplete-list/.autocomplete-item
+   styling already established by attachAddressAutocomplete() (used for the admin Property
+   Address field) — no new visual language, no API key, and nothing to configure. Unlike the
+   admin version, this one:
+     - has no "previously hosted" history list (a neighbor's home was never a past open house),
+     - softly biases results toward the current Open House's area via a one-time geocode of the
+       property address (bounded=0, so it never EXCLUDES results elsewhere — a neighbor may
+       legitimately be typing an address in another city),
+     - shows the street as the primary line and "City, ST ZIP" as a secondary line.
+   If the network call fails, is blocked, or is slow, suggestions simply don't appear — typing
+   and submitting the address manually always keeps working. */
+function attachNeighborAddressAutocomplete(input, oh){
+  var wrap = input.closest(".autocomplete-wrap");
+  if(!wrap) return;
+  var listEl = null, debounceTimer = null, biasBox = null, biasRequested = false;
+
+  function closeList(){ if(listEl){ listEl.remove(); listEl = null; } }
+  function renderList(items){
+    closeList();
+    if(!items || !items.length) return;
+    listEl = document.createElement("div");
+    listEl.className = "autocomplete-list";
+    listEl.innerHTML = items.map(function(it, i){
+      return '<div class="autocomplete-item" data-ac-idx="'+i+'">'+esc(it.street) +
+        (it.secondary ? '<span class="ac-tag" style="text-transform:none;letter-spacing:normal;">'+esc(it.secondary)+'</span>' : '') +
+      '</div>';
+    }).join("");
+    wrap.appendChild(listEl);
+    Array.prototype.forEach.call(listEl.querySelectorAll("[data-ac-idx]"), function(el){
+      el.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      el.addEventListener("click", function(){
+        var idx = parseInt(el.getAttribute("data-ac-idx"), 10);
+        input.value = items[idx].full;
+        closeList();
+        input.dispatchEvent(new Event("input", { bubbles:true }));
+      });
+    });
+  }
+  function ensureBiasBox(){
+    if(biasRequested || !oh || typeof fetch !== "function") return;
+    biasRequested = true;
+    var q = [oh.address, oh.city, oh.stateAbbr, oh.zip].filter(Boolean).join(", ");
+    if(!q) return;
+    fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q="+encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(data){ if(data && data[0] && data[0].boundingbox) biasBox = data[0].boundingbox; })
+      .catch(function(){ /* biasing is a nice-to-have only — plain lookup still works */ });
+  }
+  input.addEventListener("input", function(){
+    clearTimeout(debounceTimer);
+    var q = input.value;
+    if(q.trim().length < 3){ closeList(); return; }
+    ensureBiasBox();
+    debounceTimer = setTimeout(function(){
+      if(typeof fetch !== "function") return;
+      var url = "https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=6&q="+encodeURIComponent(q);
+      if(biasBox){
+        /* Soft bias only (bounded=0) — never restricts results to this box, since a neighbor
+           may legitimately own property outside today's open house area. */
+        var pad = 0.35;
+        var south = parseFloat(biasBox[0])-pad, north = parseFloat(biasBox[1])+pad;
+        var west = parseFloat(biasBox[2])-pad, east = parseFloat(biasBox[3])+pad;
+        url += "&viewbox="+west+","+north+","+east+","+south+"&bounded=0";
+      }
+      var controller = (typeof AbortController === "function") ? new AbortController() : null;
+      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 3000) : null;
+      fetch(url, controller ? {signal:controller.signal} : {})
+        .then(function(res){ return res.json(); })
+        .then(function(data){
+          if(timeoutId) clearTimeout(timeoutId);
+          var items = (data||[]).map(function(r){
+            var a = r.address || {};
+            var street = [a.house_number, a.road].filter(Boolean).join(" ") || (r.display_name||"").split(",")[0];
+            var city = a.city || a.town || a.village || a.hamlet || "";
+            var st = stateAbbrFromName(a.state||"");
+            var zip = a.postcode || "";
+            var cityStateZip = [city, [st, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+            var full = [street, cityStateZip].filter(Boolean).join(", ") || r.display_name;
+            return { street: street || r.display_name, secondary: cityStateZip, full: full };
+          }).filter(function(it){ return it.street; });
+          renderList(items);
+        })
+        .catch(function(){ /* offline or blocked — manual entry still works */ });
+    }, 350);
+  });
+  input.addEventListener("blur", function(){ setTimeout(closeList, 200); });
 }
 
 /* ============================================================
@@ -4208,6 +4325,7 @@ var CONTENT_FIELD_REGISTRY = [
   {group:"Confirmation Screens", path:"signin.confirmMessage", label:"Sign-In Confirmation Message (use {property})", multiline:true},
   {group:"Neighbor Follow-Up", path:"signin.neighborHeading", label:"Neighbor Screen Heading"},
   {group:"Neighbor Follow-Up", path:"signin.neighborSubtext", label:"Neighbor Screen Supporting Text", multiline:true},
+  {group:"Neighbor Follow-Up", path:"signin.neighborCardTitle", label:"Neighbor Card Title"},
   {group:"Neighbor Follow-Up", path:"signin.neighborQuestion", label:"Neighbor Screen Question"},
   {group:"Neighbor Follow-Up", path:"signin.neighborYesButton", label:'"Yes" Button Label'},
   {group:"Neighbor Follow-Up", path:"signin.neighborNoButton", label:'"Not Right Now" Button Label'},
