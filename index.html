@@ -2497,74 +2497,120 @@ var PHOTO_COMPRESS_ATTEMPTS = [
   {maxDim:800,  quality:0.6},
   {maxDim:640,  quality:0.5}
 ];
+/* Runs the resize/re-encode ladder against any decoded image source (an ImageBitmap or an
+   <img> element both work as canvas drawImage sources) and returns the smallest result that
+   fits the storage budget, or the smallest achieved if none do. */
+function runPhotoCompressAttempts(source, iw, ih){
+  var best = null;
+  for(var i=0;i<PHOTO_COMPRESS_ATTEMPTS.length;i++){
+    var a = PHOTO_COMPRESS_ATTEMPTS[i];
+    try{
+      var scale = Math.min(1, a.maxDim / Math.max(iw, ih));
+      var w = Math.max(1, Math.round(iw * scale)), h = Math.max(1, Math.round(ih * scale));
+      var canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext && canvas.getContext("2d");
+      if(!ctx) break;
+      ctx.drawImage(source, 0, 0, w, h);
+      var out = canvas.toDataURL("image/jpeg", a.quality);
+      /* Some mobile browsers return a blank/near-blank "data:," or tiny placeholder instead of
+         throwing when a canvas operation silently fails (e.g. a decode too large for this
+         device's canvas backing store) — treat a suspiciously small result as a failed attempt
+         rather than accepting it as a valid (but tiny/blank) photo. */
+      if(!out || out.length < 200) continue;
+      if(!best || out.length < best.length) best = out;
+      if(out.length <= PHOTO_MAX_CHARS) break;
+    }catch(attemptErr){ /* try the next, smaller attempt */ }
+  }
+  return best;
+}
+
 function compressPhotoForStorage(file){
+  /* Two decode strategies, tried in order:
+     1) createImageBitmap(file) — decodes directly from the file's bytes, without ever
+        building a full base64 string of the original (often multi-MB) photo in memory first.
+        This is the more memory-efficient path and the one most likely to succeed on phones/
+        tablets with large camera photos, where the old FileReader+<img> approach could bloat
+        memory enough to silently stall or fail on some devices.
+     2) FileReader -> <img> — the original approach, used only if createImageBitmap is
+        unavailable or itself fails, as a compatibility fallback. */
   return new Promise(function(resolve){
-    var reader = new FileReader();
-    reader.onerror = function(){ resolve({dataUrl:null, error:"Couldn't read that photo — try again."}); };
-    reader.onload = function(){
-      var rawDataUrl = String(reader.result || "");
-      if(!rawDataUrl){ resolve({dataUrl:null, error:"Couldn't read that photo — try again."}); return; }
-      var settled = false;
-      function settle(v){ if(settled) return; settled = true; resolve(v); }
-      /* If image decoding never completes (unsupported environment, or a very large file
-         taking longer than expected on this device), fall back to the raw file ONLY if it's
-         already small enough to safely persist as-is. Otherwise, fail with a clear message —
-         silently attempting to save a multi-MB raw blob is what caused unreliable "it just
-         doesn't work" uploads before. */
-      var safetyTimer = setTimeout(function(){
-        if(rawDataUrl.length <= PHOTO_MAX_CHARS){ settle({dataUrl:rawDataUrl, error:null}); }
-        else{ settle({dataUrl:null, error:"This photo is taking too long to process on this device. Try a smaller photo."}); }
-      }, 4000);
-      try{
-        var img = new Image();
-        img.onerror = function(){
+    var settled = false;
+    function settle(v){ if(settled) return; settled = true; resolve(v); }
+
+    function viaFileReaderFallback(){
+      var reader = new FileReader();
+      reader.onerror = function(){ settle({dataUrl:null, error:"Couldn't read that photo — try again."}); };
+      reader.onload = function(){
+        var rawDataUrl = String(reader.result || "");
+        if(!rawDataUrl){ settle({dataUrl:null, error:"Couldn't read that photo — try again."}); return; }
+        var readerSettled = false;
+        function readerSettle(v){ if(readerSettled) return; readerSettled = true; settle(v); }
+        /* If image decoding never completes (very large file taking longer than expected on
+           this device), fall back to the raw file ONLY if it's already small enough to safely
+           persist as-is. Otherwise, fail with a clear message — silently attempting to save a
+           multi-MB raw blob is what caused unreliable "it just doesn't work" uploads before. */
+        var safetyTimer = setTimeout(function(){
+          if(rawDataUrl.length <= PHOTO_MAX_CHARS){ readerSettle({dataUrl:rawDataUrl, error:null}); }
+          else{ readerSettle({dataUrl:null, error:"This photo is taking too long to process on this device. Try a smaller photo."}); }
+        }, 4000);
+        try{
+          var img = new Image();
+          img.onerror = function(){
+            clearTimeout(safetyTimer);
+            if(rawDataUrl.length <= PHOTO_MAX_CHARS){ readerSettle({dataUrl:rawDataUrl, error:null}); }
+            else{ readerSettle({dataUrl:null, error:"Couldn't read that photo — try again."}); }
+          };
+          img.onload = function(){
+            clearTimeout(safetyTimer);
+            try{
+              var iw = img.naturalWidth || img.width || 1600, ih = img.naturalHeight || img.height || 1600;
+              var best = runPhotoCompressAttempts(img, iw, ih);
+              if(!best){
+                if(rawDataUrl.length <= PHOTO_MAX_CHARS){ readerSettle({dataUrl:rawDataUrl, error:null}); }
+                else{ readerSettle({dataUrl:null, error:"This photo is too large to process on this device. Try a smaller photo."}); }
+                return;
+              }
+              if(best.length > PHOTO_MAX_CHARS){
+                readerSettle({dataUrl:null, error:"This photo is still too large after compression. Try a different photo."});
+                return;
+              }
+              readerSettle({dataUrl:best, error:null});
+            }catch(e){ readerSettle({dataUrl:null, error:"Couldn't process that photo — try again."}); }
+          };
+          img.src = rawDataUrl;
+        }catch(e){
           clearTimeout(safetyTimer);
-          if(rawDataUrl.length <= PHOTO_MAX_CHARS){ settle({dataUrl:rawDataUrl, error:null}); }
-          else{ settle({dataUrl:null, error:"Couldn't read that photo — try again."}); }
-        };
-        img.onload = function(){
-          clearTimeout(safetyTimer);
-          try{
-            var iw = img.naturalWidth || img.width || 1600, ih = img.naturalHeight || img.height || 1600;
-            var best = null;
-            for(var i=0;i<PHOTO_COMPRESS_ATTEMPTS.length;i++){
-              var a = PHOTO_COMPRESS_ATTEMPTS[i];
-              try{
-                var scale = Math.min(1, a.maxDim / Math.max(iw, ih));
-                var w = Math.max(1, Math.round(iw * scale)), h = Math.max(1, Math.round(ih * scale));
-                var canvas = document.createElement("canvas");
-                canvas.width = w; canvas.height = h;
-                var ctx = canvas.getContext && canvas.getContext("2d");
-                if(!ctx) break;
-                ctx.drawImage(img, 0, 0, w, h);
-                var out = canvas.toDataURL("image/jpeg", a.quality);
-                if(!out || out.length < 50) continue;
-                if(!best || out.length < best.length) best = out;
-                if(out.length <= PHOTO_MAX_CHARS) break;
-              }catch(attemptErr){ /* try the next, smaller attempt */ }
-            }
-            if(!best){
-              /* Canvas compression unavailable in this environment. Use the raw file only if
-                 it's already small enough; otherwise fail clearly instead of guessing. */
-              if(rawDataUrl.length <= PHOTO_MAX_CHARS){ settle({dataUrl:rawDataUrl, error:null}); }
-              else{ settle({dataUrl:null, error:"This photo is too large to process on this device. Try a smaller photo."}); }
-              return;
-            }
-            if(best.length > PHOTO_MAX_CHARS){
-              settle({dataUrl:null, error:"This photo is still too large after compression. Try a different photo."});
-              return;
-            }
-            settle({dataUrl:best, error:null});
-          }catch(e){ settle({dataUrl:null, error:"Couldn't process that photo — try again."}); }
-        };
-        img.src = rawDataUrl;
-      }catch(e){
-        clearTimeout(safetyTimer);
-        if(rawDataUrl.length <= PHOTO_MAX_CHARS){ settle({dataUrl:rawDataUrl, error:null}); }
-        else{ settle({dataUrl:null, error:"Couldn't read that photo — try again."}); }
-      }
-    };
-    reader.readAsDataURL(file);
+          if(rawDataUrl.length <= PHOTO_MAX_CHARS){ readerSettle({dataUrl:rawDataUrl, error:null}); }
+          else{ readerSettle({dataUrl:null, error:"Couldn't read that photo — try again."}); }
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    if(typeof createImageBitmap === "function"){
+      var bitmapTimedOut = false;
+      var bitmapTimer = setTimeout(function(){ bitmapTimedOut = true; viaFileReaderFallback(); }, 4000);
+      createImageBitmap(file).then(function(bitmap){
+        clearTimeout(bitmapTimer);
+        if(bitmapTimedOut || settled) return;
+        try{
+          var best = runPhotoCompressAttempts(bitmap, bitmap.width, bitmap.height);
+          if(bitmap.close) bitmap.close();
+          if(!best){ viaFileReaderFallback(); return; }
+          if(best.length > PHOTO_MAX_CHARS){
+            settle({dataUrl:null, error:"This photo is still too large after compression. Try a different photo."});
+            return;
+          }
+          settle({dataUrl:best, error:null});
+        }catch(e){ viaFileReaderFallback(); }
+      }).catch(function(){
+        clearTimeout(bitmapTimer);
+        if(!bitmapTimedOut && !settled) viaFileReaderFallback();
+      });
+    }else{
+      viaFileReaderFallback();
+    }
   });
 }
 function sheetEditProperty(oh){
@@ -4566,6 +4612,17 @@ var Sync = {
        room converges on the upgraded structure the next time it pulls, instead of waiting
        on some unrelated future edit to trigger the next push. */
     this.push();
+    /* The state above is applied either way, so sync correctness never depends on what
+       follows — but a full re-render right now would destroy whatever the person on THIS
+       device currently has on screen and hasn't saved yet. That's most critical on the
+       visitor-facing Sign-In kiosk: a real visitor mid-form, seeing the page reset out from
+       under them because an agent elsewhere just marked an unrelated follow-up done, is
+       exactly the "it keeps resetting while I'm signing in" bug. Skip the repaint whenever
+       we're on that screen, or whenever the person is actively typing anywhere else — the
+       next natural re-render (submit, navigation, etc.) already reflects the fresh state. */
+    var activeEl = document.activeElement;
+    var isTyping = !!activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.isContentEditable);
+    if((route && route.name === "signin") || isTyping) return;
     appEl.removeEventListener("click", globalClickHandler);
     render();
   },
