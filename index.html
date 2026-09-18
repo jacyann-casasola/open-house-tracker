@@ -2484,37 +2484,85 @@ function propertyPhotoFieldHtml(oh){
    image can't be decoded/drawn (or this runs somewhere without canvas support), it resolves
    with the original uncompressed data instead of blocking the upload. Only resolves null if
    the file itself couldn't be read at all. */
+/* Photo persistence budget: kept well under typical browser per-origin localStorage quotas
+   (5-10MB), leaving headroom for multiple properties' photos plus visitor data sharing the
+   same storage. If a photo can't be brought under this size, we say so plainly rather than
+   attempting the save and risking a silent/cryptic quota failure. */
+var PHOTO_MAX_CHARS = 1.3 * 1024 * 1024;
+/* Progressively smaller/lower-quality re-encodes, tried in order until one fits the budget. */
+var PHOTO_COMPRESS_ATTEMPTS = [
+  {maxDim:1600, quality:0.82},
+  {maxDim:1280, quality:0.75},
+  {maxDim:1024, quality:0.68},
+  {maxDim:800,  quality:0.6},
+  {maxDim:640,  quality:0.5}
+];
 function compressPhotoForStorage(file){
   return new Promise(function(resolve){
     var reader = new FileReader();
-    reader.onerror = function(){ resolve(null); };
+    reader.onerror = function(){ resolve({dataUrl:null, error:"Couldn't read that photo — try again."}); };
     reader.onload = function(){
       var rawDataUrl = String(reader.result || "");
-      if(!rawDataUrl){ resolve(null); return; }
+      if(!rawDataUrl){ resolve({dataUrl:null, error:"Couldn't read that photo — try again."}); return; }
       var settled = false;
       function settle(v){ if(settled) return; settled = true; resolve(v); }
-      var safetyTimer = setTimeout(function(){ settle(rawDataUrl); }, 1500);
+      /* If image decoding never completes (unsupported environment, or a very large file
+         taking longer than expected on this device), fall back to the raw file ONLY if it's
+         already small enough to safely persist as-is. Otherwise, fail with a clear message —
+         silently attempting to save a multi-MB raw blob is what caused unreliable "it just
+         doesn't work" uploads before. */
+      var safetyTimer = setTimeout(function(){
+        if(rawDataUrl.length <= PHOTO_MAX_CHARS){ settle({dataUrl:rawDataUrl, error:null}); }
+        else{ settle({dataUrl:null, error:"This photo is taking too long to process on this device. Try a smaller photo."}); }
+      }, 4000);
       try{
         var img = new Image();
-        img.onerror = function(){ clearTimeout(safetyTimer); settle(rawDataUrl); };
+        img.onerror = function(){
+          clearTimeout(safetyTimer);
+          if(rawDataUrl.length <= PHOTO_MAX_CHARS){ settle({dataUrl:rawDataUrl, error:null}); }
+          else{ settle({dataUrl:null, error:"Couldn't read that photo — try again."}); }
+        };
         img.onload = function(){
           clearTimeout(safetyTimer);
           try{
-            var maxDim = 1600;
-            var iw = img.naturalWidth || img.width || maxDim, ih = img.naturalHeight || img.height || maxDim;
-            var scale = Math.min(1, maxDim / Math.max(iw, ih));
-            var w = Math.max(1, Math.round(iw * scale)), h = Math.max(1, Math.round(ih * scale));
-            var canvas = document.createElement("canvas");
-            canvas.width = w; canvas.height = h;
-            var ctx = canvas.getContext && canvas.getContext("2d");
-            if(!ctx){ settle(rawDataUrl); return; }
-            ctx.drawImage(img, 0, 0, w, h);
-            var compressed = canvas.toDataURL("image/jpeg", 0.82);
-            settle((compressed && compressed.length < rawDataUrl.length) ? compressed : rawDataUrl);
-          }catch(e){ settle(rawDataUrl); }
+            var iw = img.naturalWidth || img.width || 1600, ih = img.naturalHeight || img.height || 1600;
+            var best = null;
+            for(var i=0;i<PHOTO_COMPRESS_ATTEMPTS.length;i++){
+              var a = PHOTO_COMPRESS_ATTEMPTS[i];
+              try{
+                var scale = Math.min(1, a.maxDim / Math.max(iw, ih));
+                var w = Math.max(1, Math.round(iw * scale)), h = Math.max(1, Math.round(ih * scale));
+                var canvas = document.createElement("canvas");
+                canvas.width = w; canvas.height = h;
+                var ctx = canvas.getContext && canvas.getContext("2d");
+                if(!ctx) break;
+                ctx.drawImage(img, 0, 0, w, h);
+                var out = canvas.toDataURL("image/jpeg", a.quality);
+                if(!out || out.length < 50) continue;
+                if(!best || out.length < best.length) best = out;
+                if(out.length <= PHOTO_MAX_CHARS) break;
+              }catch(attemptErr){ /* try the next, smaller attempt */ }
+            }
+            if(!best){
+              /* Canvas compression unavailable in this environment. Use the raw file only if
+                 it's already small enough; otherwise fail clearly instead of guessing. */
+              if(rawDataUrl.length <= PHOTO_MAX_CHARS){ settle({dataUrl:rawDataUrl, error:null}); }
+              else{ settle({dataUrl:null, error:"This photo is too large to process on this device. Try a smaller photo."}); }
+              return;
+            }
+            if(best.length > PHOTO_MAX_CHARS){
+              settle({dataUrl:null, error:"This photo is still too large after compression. Try a different photo."});
+              return;
+            }
+            settle({dataUrl:best, error:null});
+          }catch(e){ settle({dataUrl:null, error:"Couldn't process that photo — try again."}); }
         };
         img.src = rawDataUrl;
-      }catch(e){ clearTimeout(safetyTimer); settle(rawDataUrl); }
+      }catch(e){
+        clearTimeout(safetyTimer);
+        if(rawDataUrl.length <= PHOTO_MAX_CHARS){ settle({dataUrl:rawDataUrl, error:null}); }
+        else{ settle({dataUrl:null, error:"Couldn't read that photo — try again."}); }
+      }
     };
     reader.readAsDataURL(file);
   });
@@ -2565,14 +2613,14 @@ function sheetEditProperty(oh){
       if(photoFileInput) photoFileInput.disabled = true;
       setPhotoStatus("uploading", "Uploading photo…");
       var previousPhoto = oh.photoDataUrl;
-      compressPhotoForStorage(file).then(function(dataUrl){
+      compressPhotoForStorage(file).then(function(result){
         photoUploading = false;
         if(photoFileInput){ photoFileInput.disabled = false; photoFileInput.value = ""; }
-        if(!dataUrl){
-          setPhotoStatus("error", "Couldn't read that photo — try again.");
+        if(!result || !result.dataUrl){
+          setPhotoStatus("error", (result && result.error) || "Couldn't read that photo — try again.");
           return;
         }
-        oh.photoDataUrl = dataUrl;
+        oh.photoDataUrl = result.dataUrl;
         var persisted = saveState();
         if(!persisted){
           /* Keep the previously saved photo — never leave an unsaved, temporary reference
