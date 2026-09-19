@@ -2525,15 +2525,44 @@ function runPhotoCompressAttempts(source, iw, ih){
   return best;
 }
 
+/* Decodes DIRECTLY at a reduced size via createImageBitmap's resize options, when the
+   browser supports them — the decoder never has to materialize a full-resolution bitmap in
+   memory at all. This matters most for modern phone cameras (48MP+ sensors can produce a
+   ~190MB decoded bitmap at full size), where decoding-then-downscaling can exhaust available
+   memory on a phone/tablet and silently stall or fail before compression ever gets a chance
+   to run. Falls back to null (caller tries the next strategy) if resize options aren't
+   respected or this path fails for any reason — never the only strategy attempted. */
+function tryResizedBitmapCompress(file){
+  return PHOTO_COMPRESS_ATTEMPTS.reduce(function(chain, a){
+    return chain.then(function(best){
+      if(best && best.length <= PHOTO_MAX_CHARS) return best; // already good enough, stop early
+      return createImageBitmap(file, { resizeWidth: a.maxDim, resizeQuality: "medium" }).then(function(bitmap){
+        try{
+          var canvas = document.createElement("canvas");
+          canvas.width = bitmap.width; canvas.height = bitmap.height;
+          var ctx = canvas.getContext && canvas.getContext("2d");
+          if(!ctx){ if(bitmap.close) bitmap.close(); return best; }
+          ctx.drawImage(bitmap, 0, 0);
+          if(bitmap.close) bitmap.close();
+          var out = canvas.toDataURL("image/jpeg", a.quality);
+          if(!out || out.length < 200) return best;
+          if(!best || out.length < best.length) return out;
+          return best;
+        }catch(e){ if(bitmap.close) bitmap.close(); return best; }
+      });
+    });
+  }, Promise.resolve(null));
+}
+
 function compressPhotoForStorage(file){
-  /* Two decode strategies, tried in order:
-     1) createImageBitmap(file) — decodes directly from the file's bytes, without ever
-        building a full base64 string of the original (often multi-MB) photo in memory first.
-        This is the more memory-efficient path and the one most likely to succeed on phones/
-        tablets with large camera photos, where the old FileReader+<img> approach could bloat
-        memory enough to silently stall or fail on some devices.
-     2) FileReader -> <img> — the original approach, used only if createImageBitmap is
-        unavailable or itself fails, as a compatibility fallback. */
+  /* Decode strategies, tried in order, each falling through to the next on failure:
+     1) createImageBitmap with resize options — decodes directly at a reduced size, so a very
+        large modern-camera photo is never fully decoded at full resolution in memory. Most
+        likely to succeed on memory-constrained phones/tablets.
+     2) createImageBitmap(file) at full size, then downscale via canvas — used if a browser
+        ignores/rejects resize options.
+     3) FileReader -> <img> — the original approach, used only if createImageBitmap is
+        unavailable entirely, as a last-resort compatibility fallback. */
   return new Promise(function(resolve){
     var settled = false;
     function settle(v){ if(settled) return; settled = true; resolve(v); }
@@ -2588,7 +2617,8 @@ function compressPhotoForStorage(file){
       reader.readAsDataURL(file);
     }
 
-    if(typeof createImageBitmap === "function"){
+    function viaFullDecodeBitmap(){
+      if(typeof createImageBitmap !== "function"){ viaFileReaderFallback(); return; }
       var bitmapTimedOut = false;
       var bitmapTimer = setTimeout(function(){ bitmapTimedOut = true; viaFileReaderFallback(); }, 4000);
       createImageBitmap(file).then(function(bitmap){
@@ -2607,6 +2637,25 @@ function compressPhotoForStorage(file){
       }).catch(function(){
         clearTimeout(bitmapTimer);
         if(!bitmapTimedOut && !settled) viaFileReaderFallback();
+      });
+    }
+
+    if(typeof createImageBitmap === "function"){
+      var resizeTimedOut = false;
+      var resizeTimer = setTimeout(function(){ resizeTimedOut = true; viaFullDecodeBitmap(); }, 4000);
+      tryResizedBitmapCompress(file).then(function(best){
+        clearTimeout(resizeTimer);
+        if(resizeTimedOut || settled) return;
+        if(!best){ viaFullDecodeBitmap(); return; }
+        if(best.length > PHOTO_MAX_CHARS){
+          settle({dataUrl:null, error:"This photo is still too large after compression. Try a different photo."});
+          return;
+        }
+        settle({dataUrl:best, error:null});
+      }).catch(function(err){
+        clearTimeout(resizeTimer);
+        if(window.console) console.error("Photo resize-decode failed, falling back:", err);
+        if(!resizeTimedOut && !settled) viaFullDecodeBitmap();
       });
     }else{
       viaFileReaderFallback();
