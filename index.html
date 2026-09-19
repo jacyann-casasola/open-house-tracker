@@ -1765,6 +1765,11 @@ function migrateState(){
 migrateState();
 applyBrandStyles();
 
+/* Diagnostic-only: the full reason the last saveState() call failed, if it did. Never shown
+   directly in any UI copy (no visitor data, credentials, or image contents ever end up here —
+   just a byte count and the browser's own error name/message) but logged to console so a real
+   failure can be told apart from a guess. Cleared to null on every successful save. */
+var lastSaveError = null;
 function saveState(){
   /* Returns true/false so callers that need real confirmation (e.g. the property photo
      upload flow) can tell an actual persisted save apart from a silently-dropped one — most
@@ -1772,9 +1777,47 @@ function saveState(){
      here if the JSON (most often a large embedded photo) exceeds the browser's localStorage
      quota; previously that failure was swallowed with no feedback anywhere in the app. */
   var ok = true;
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ ok = false; }
+  var serialized;
+  try{
+    serialized = JSON.stringify(state);
+    localStorage.setItem(STORAGE_KEY, serialized);
+    lastSaveError = null;
+  }catch(e){
+    ok = false;
+    lastSaveError = {
+      name: e && e.name,
+      message: e && e.message,
+      attemptedBytes: serialized ? serialized.length : null,
+      isQuotaError: !!(e && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED" || e.code === 22 || e.code === 1014))
+    };
+    if(window.console){
+      console.error("saveState() failed — the write to localStorage did not persist.", {
+        errorName: lastSaveError.name, errorMessage: lastSaveError.message,
+        attemptedWriteBytes: lastSaveError.attemptedBytes, isQuotaError: lastSaveError.isQuotaError
+      });
+    }
+  }
   if(typeof Sync !== "undefined" && Sync && Sync.push) Sync.push();
   return ok;
+}
+/* Best-effort, read-only snapshot of current storage pressure — never mutates anything.
+   Logged to console only; not surfaced in any UI copy. */
+function logStorageDiagnostics(label){
+  if(!window.console) return;
+  try{
+    var raw = localStorage.getItem(STORAGE_KEY) || "";
+    console.log("[Storage diagnostic] " + (label||""), {
+      currentSavedStateBytes: raw.length,
+      openHouseCount: (state.openHouses||[]).length,
+      visitorCount: (state.visitors||[]).length,
+      photosStored: (state.openHouses||[]).filter(function(o){ return !!o.photoDataUrl; }).map(function(o){ return { openHouseId:o.id, photoBytes: (o.photoDataUrl||"").length, status:o.status }; })
+    });
+    if(navigator.storage && navigator.storage.estimate){
+      navigator.storage.estimate().then(function(est){
+        console.log("[Storage diagnostic] browser quota estimate", { usageBytes: est.usage, quotaBytes: est.quota });
+      }).catch(function(){});
+    }
+  }catch(e){}
 }
 saveState();
 
@@ -2708,22 +2751,41 @@ function sheetEditProperty(oh){
       if(photoFileInput) photoFileInput.disabled = true;
       setPhotoStatus("uploading", "Uploading photo…");
       var previousPhoto = oh.photoDataUrl;
+      if(window.console) console.log("[Photo upload] starting", { originalFileBytes: file.size, fileType: file.type });
+      logStorageDiagnostics("before upload");
       compressPhotoForStorage(file).then(function(result){
         photoUploading = false;
         if(photoFileInput){ photoFileInput.disabled = false; photoFileInput.value = ""; }
         if(!result || !result.dataUrl){
+          if(window.console) console.log("[Photo upload] compression stage did not produce a result", { error: result && result.error });
           setPhotoStatus("error", (result && result.error) || "Couldn't read that photo — try again.");
           return;
         }
+        if(window.console) console.log("[Photo upload] compression succeeded", { originalFileBytes: file.size, compressedDataUrlChars: result.dataUrl.length });
         oh.photoDataUrl = result.dataUrl;
         var persisted = saveState();
         if(!persisted){
           /* Keep the previously saved photo — never leave an unsaved, temporary reference
              in place and call it done. */
           oh.photoDataUrl = previousPhoto;
-          setPhotoStatus("error", "Couldn't save photo — it may be too large. Try again or use a smaller image.");
+          if(window.console) console.log("[Photo upload] local save failed", lastSaveError);
+          logStorageDiagnostics("after failed save");
+          /* A real localStorage failure here is almost always the TOTAL saved data (every open
+             house's data and photos, all visitor records) hitting this browser's storage limit
+             — not this specific photo, which already passed compression. Say that plainly
+             instead of blaming "too large" on an image that may well be small, per the actual
+             attempted write size captured in lastSaveError. */
+          var errMsg;
+          if(lastSaveError && lastSaveError.isQuotaError){
+            errMsg = "Couldn't save — this browser's storage is full. This photo compressed fine; the problem is your total saved data (other open houses, photos, and visitor records). Free up space (e.g. remove an older property photo) and try again.";
+          }else{
+            errMsg = "Couldn't save photo — try again.";
+          }
+          setPhotoStatus("error", errMsg);
           return;
         }
+        if(window.console) console.log("[Photo upload] saved locally", { syncEnabled: !!(state.sync && state.sync.enabled), syncStatus: (typeof Sync !== "undefined" && Sync) ? Sync.status : "n/a" });
+        logStorageDiagnostics("after successful save");
         refreshPhotoUI();
         setPhotoStatus("success", "Photo saved");
         appEl.removeEventListener("click", globalClickHandler);
@@ -4922,6 +4984,7 @@ function screenAdminSettings(){
   if(section==="team") return screenSettingsTeam();
   if(section==="design") return screenSettingsDesign();
   if(section==="sync") return screenSettingsSync();
+  if(section==="backup") return screenSettingsBackup();
   return screenSettingsHub();
 }
 function mountSettings(){
@@ -4932,6 +4995,7 @@ function mountSettings(){
   if(section==="team") return mountSettingsTeam();
   if(section==="design") return mountSettingsDesign();
   if(section==="sync") return mountSettingsSync();
+  if(section==="backup") return mountSettingsBackup();
 }
 
 function settingsHubCard(section, title, sub){
@@ -4952,6 +5016,7 @@ function screenSettingsHub(){
       settingsHubCard("team", "Team Settings", "Who appears in Assigned To") +
       settingsHubCard("design", "Branding & Formats", "Logo, accent color, fonts, dates, currency") +
       settingsHubCard("sync", "Data Sync", syncHubSubtitle()) +
+      settingsHubCard("backup", "Backup & Restore", "Export your data, or restore from a backup file") +
     '</div></div>';
 }
 function syncHubSubtitle(){
@@ -5368,6 +5433,136 @@ function mountSettingsSync(){
       render();
     });
   }
+}
+
+/* ---- Backup & Restore ---- */
+var BACKUP_SCHEMA_VERSION = 1;
+function buildBackupPayload(){
+  /* Deliberately excludes state.sync (Firebase API keys/credentials, specific to this device's
+     connection, not "your data") and state.settings — a backup restores records, not device
+     configuration. Includes every Open House Event (with its saved photo, embedded the same
+     way it's already stored) and every visitor record (feedback, follow-up, tasks, everything
+     under detail). */
+  return {
+    schema: "open-house-tracker-backup",
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    openHouses: state.openHouses,
+    visitors: state.visitors
+  };
+}
+function validateBackupPayload(obj){
+  if(!obj || typeof obj !== "object") return "This file doesn't look like a valid backup.";
+  if(!Array.isArray(obj.openHouses)) return "This file is missing Open House Event data.";
+  if(!Array.isArray(obj.visitors)) return "This file is missing visitor data.";
+  return null;
+}
+function screenSettingsBackup(){
+  return '<div class="screen">' + topbar("Backup & Restore", {backTo:"settings"}) +
+    '<div class="content">' +
+      '<div class="section-head"><h3>Export Backup</h3></div>' +
+      '<div class="card">' +
+        '<div class="settings-help" style="margin-bottom:12px;">Downloads every Open House Event, visitor record, feedback, follow-up, and saved property photo as a single JSON file you can keep somewhere safe.</div>' +
+        '<button type="button" class="btn btn-primary btn-sm" id="backup-export-btn">Export Backup</button>' +
+      '</div>' +
+      '<div class="section-head"><h3>Import Backup</h3></div>' +
+      '<div class="card">' +
+        '<div class="settings-help" style="margin-bottom:12px;">Restores Open House Events and visitors from a previously exported backup file. Existing data is never overwritten or deleted — records already on this device are left exactly as they are; only records not already here are added.</div>' +
+        '<div class="file-btn-wrap"><button type="button" class="btn btn-secondary btn-sm" id="backup-import-label">Choose Backup File</button><input type="file" id="backup-import-file" accept=".json,application/json"></div>' +
+      '</div>' +
+      '<div class="settings-help">Sync settings (Firebase credentials) aren\'t included in a backup, since those belong to a device\'s connection rather than your actual data. If you use Data Sync, reconnect it separately after restoring on a new device.</div>' +
+    '</div></div>';
+}
+function mountSettingsBackup(){
+  var container = document.querySelector(".screen");
+  if(!container) return;
+
+  var exportBtn = container.querySelector("#backup-export-btn");
+  if(exportBtn){
+    exportBtn.addEventListener("click", function(){
+      try{
+        var payload = buildBackupPayload();
+        var json = JSON.stringify(payload, null, 2);
+        var blob = new Blob([json], {type:"application/json"});
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        var stamp = new Date().toISOString().slice(0,10);
+        a.href = url;
+        a.download = "open-house-tracker-backup-" + stamp + ".json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+        toast("Backup downloaded");
+      }catch(e){
+        if(window.console) console.error("Backup export failed", e);
+        toast("Couldn't create backup file");
+      }
+    });
+  }
+
+  var importInput = container.querySelector("#backup-import-file");
+  if(importInput){
+    importInput.addEventListener("change", function(){
+      var file = importInput.files && importInput.files[0];
+      importInput.value = "";
+      if(!file) return;
+      var reader = new FileReader();
+      reader.onerror = function(){ toast("Couldn't read that file"); };
+      reader.onload = function(){
+        var parsed;
+        try{ parsed = JSON.parse(String(reader.result||"")); }
+        catch(e){ toast("That file isn't valid JSON"); return; }
+        var err = validateBackupPayload(parsed);
+        if(err){ toast(err); return; }
+        sheetConfirmImportBackup(parsed);
+      };
+      reader.readAsText(file);
+    });
+  }
+}
+function sheetConfirmImportBackup(parsed){
+  /* Non-destructive by design: existing records (matched by id) are left completely alone —
+     only records from the backup that don't already exist on this device get added. Nothing
+     currently saved is ever overwritten or deleted during import. */
+  var existingOhIds = {}; state.openHouses.forEach(function(o){ existingOhIds[o.id]=true; });
+  var existingVisitorIds = {}; state.visitors.forEach(function(v){ existingVisitorIds[v.id]=true; });
+  var newOhCount = parsed.openHouses.filter(function(o){ return o && o.id && !existingOhIds[o.id]; }).length;
+  var newVisitorCount = parsed.visitors.filter(function(v){ return v && v.id && !existingVisitorIds[v.id]; }).length;
+  var dupCount = (parsed.openHouses.length - newOhCount) + (parsed.visitors.length - newVisitorCount);
+
+  var body =
+    '<div class="sheet-head"><h3>Import this backup?</h3><button class="sheet-close" data-sheet-close>'+ICONS.close+'</button></div>' +
+    '<div class="sheet-body">' +
+      '<p style="font-size:14px;color:var(--ink-soft);line-height:1.6;margin-bottom:14px;">This file contains '+parsed.openHouses.length+' Open House Event'+(parsed.openHouses.length===1?"":"s")+' and '+parsed.visitors.length+' visitor record'+(parsed.visitors.length===1?"":"s")+'.</p>' +
+      '<p style="font-size:14px;color:var(--ink-soft);line-height:1.6;margin-bottom:14px;">'+newOhCount+' new Open House Event'+(newOhCount===1?"":"s")+' and '+newVisitorCount+' new visitor record'+(newVisitorCount===1?"":"s")+' will be added.'+
+        (dupCount>0 ? ' '+dupCount+' record'+(dupCount===1?"":"s")+' already exist on this device and will be left untouched.' : '') +
+      '</p>' +
+      '<p style="font-size:13px;color:var(--ink-soft);line-height:1.6;">Nothing currently saved on this device will be overwritten or deleted.</p>' +
+    '</div>' +
+    '<div class="sheet-footer"><div class="btn-row">' +
+      '<button class="btn btn-secondary" data-sheet-cancel>Cancel</button>' +
+      '<button class="btn btn-primary" id="confirm-import-backup">Import</button>' +
+    '</div></div>';
+
+  openSheet(body, function(sheet, close){
+    sheet.querySelector("[data-sheet-close]").addEventListener("click", close);
+    sheet.querySelector("[data-sheet-cancel]").addEventListener("click", close);
+    sheet.querySelector("#confirm-import-backup").addEventListener("click", function(){
+      var addedOh = 0, addedVisitors = 0;
+      parsed.openHouses.forEach(function(o){
+        if(o && o.id && !existingOhIds[o.id]){ state.openHouses.push(o); existingOhIds[o.id]=true; addedOh++; }
+      });
+      parsed.visitors.forEach(function(v){
+        if(v && v.id && !existingVisitorIds[v.id]){ state.visitors.push(migrateVisitorRecord(v)); existingVisitorIds[v.id]=true; addedVisitors++; }
+      });
+      saveState();
+      close();
+      toast("Imported "+addedOh+" open house"+(addedOh===1?"":"s")+" and "+addedVisitors+" visitor"+(addedVisitors===1?"":"s"));
+      appEl.removeEventListener("click", globalClickHandler);
+      render();
+    });
+  });
 }
 
 /* ============================================================
