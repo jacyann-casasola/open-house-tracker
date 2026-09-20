@@ -3236,7 +3236,21 @@ function mountSignIn(){
 
   var submitBtn = document.querySelector("#s-submit");
   if(submitBtn){
+    /* EMERGENCY FIX (visitor sign-in not saving): this handler used to call saveState() and
+       then unconditionally navigate on to the thank-you/follow-up screen, regardless of
+       whether the write actually succeeded — saveState() has returned a real true/false since
+       the property-photo storage fix, but this call site (and the two follow-up submit
+       handlers below) never checked it. On a device whose localStorage is genuinely full,
+       that meant a visitor could fill out the entire form, see the normal "you're all set"
+       experience, and have nothing persisted at all — a false success with silently lost
+       data. Fixed by checking the return value: only advance the screen on a confirmed save,
+       and on failure, roll back the tentative record (so a retry can never create a second/
+       duplicate visitor for the same sign-in) and tell the visitor plainly what happened
+       instead of pretending it worked. `submitting` guards against a rapid double-tap firing
+       this handler twice before the first attempt finishes. */
+    var submitting = false;
     submitBtn.addEventListener("click", function(){
+      if(submitting) return;
       var nameEl = document.querySelector("#s-name");
       var phoneEl = document.querySelector("#s-phone");
       var emailEl = document.querySelector("#s-email");
@@ -3260,8 +3274,20 @@ function mountSignIn(){
            they can see it in person. */
         source: "selfSignIn"
       }, true);
+      submitting = true;
       state.visitors.push(v);
-      saveState();
+      var persisted = saveState();
+      if(!persisted){
+        /* Roll back — never leave an unsaved record sitting only in memory. Every field the
+           visitor typed is still in the form (nothing here clears the inputs or navigates
+           away), so pressing Submit again is a clean single retry, not a duplicate. */
+        state.visitors.pop();
+        submitting = false;
+        toast(lastSaveError && lastSaveError.isQuotaError
+          ? "Couldn't save — this device's storage is full. Nothing was lost, but please let your host know and try again."
+          : "Couldn't save your information — please try again.");
+        return;
+      }
       /* Neighbor Home Value Follow-Up: everyone else goes straight to the normal thank-you
          screen (unchanged); a Neighbor sees one extra low-pressure phase first, reusing this
          exact same visitor record (v.id) — no duplicate record is ever created. */
@@ -3354,8 +3380,16 @@ function mountNeighborOffer(){
     attachNeighborAddressAutocomplete(addressEl, nv.openHouseId ? state.openHouses.find(function(o){ return o.id===nv.openHouseId; }) : activeOpenHouse());
   }
   if(submitBtn){
+    /* EMERGENCY FIX — same unchecked-save issue as the main sign-in Submit above: this used to
+       write the response and navigate on regardless of whether saveState() actually persisted.
+       Now the write is verified before advancing; on failure the response is rolled back to
+       its prior value (this visitor record itself was already saved back at the main sign-in
+       step, so nothing about the underlying record is lost — only this specific answer is
+       retried) and the visitor sees a plain error instead of a false "you're all set". */
+    var submitting = false;
     submitBtn.addEventListener("click", function(){
-      if(submitBtn.disabled) return;
+      if(submitBtn.disabled || submitting) return;
+      var prevAddress = d.homeAddress, prevValuation = d.homeValuationRequested, prevNextAction = d.followUp.nextAction;
       if(selection === "yes"){
         var address = addressEl ? addressEl.value.trim() : "";
         if(!address){ if(addressEl) addressEl.focus(); toast("Enter your property address"); return; }
@@ -3370,7 +3404,18 @@ function mountNeighborOffer(){
       }
       /* selection === "no": intentionally writes nothing — no address, no valuation flag, no
          follow-up action. Declining is not a negative lead status, just an explicit no-op. */
-      saveState();
+      submitting = true;
+      var persisted = saveState();
+      if(!persisted){
+        d.homeAddress = prevAddress;
+        d.homeValuationRequested = prevValuation;
+        d.followUp.nextAction = prevNextAction;
+        submitting = false;
+        toast(lastSaveError && lastSaveError.isQuotaError
+          ? "Couldn't save — this device's storage is full. Nothing was lost, but please let your host know and try again."
+          : "Couldn't save — please try again.");
+        return;
+      }
       goToConfirm();
     });
   }
@@ -3450,8 +3495,14 @@ function mountFollowUpOffer(idPrefix){
   }
   if(emailEl) emailEl.addEventListener("input", updateSubmitState);
   if(submitBtn){
+    /* EMERGENCY FIX — same unchecked-save issue as the main sign-in and Neighbor submit
+       handlers: verify saveState() actually persisted before advancing, and roll back this
+       specific answer (not the whole visitor record, which was already saved at the main
+       sign-in step) on failure so a retry can never duplicate or half-apply the response. */
+    var submitting = false;
     submitBtn.addEventListener("click", function(){
-      if(submitBtn.disabled) return;
+      if(submitBtn.disabled || submitting) return;
+      var prevEmail = nv.email, prevSimilar = d.similarPropertiesRequested;
       if(selection === "yes"){
         var email = emailEl ? emailEl.value.trim() : "";
         if(!email || !EMAIL_RE.test(email)){ if(emailEl) emailEl.focus(); toast("Enter a valid email address"); return; }
@@ -3463,7 +3514,17 @@ function mountFollowUpOffer(idPrefix){
            that switching from Yes to No before Submit never leaves a stale "true" behind. */
         d.similarPropertiesRequested = false;
       }
-      saveState();
+      submitting = true;
+      var persisted = saveState();
+      if(!persisted){
+        nv.email = prevEmail;
+        d.similarPropertiesRequested = prevSimilar;
+        submitting = false;
+        toast(lastSaveError && lastSaveError.isQuotaError
+          ? "Couldn't save — this device's storage is full. Nothing was lost, but please let your host know and try again."
+          : "Couldn't save — please try again.");
+        return;
+      }
       goToConfirm();
     });
   }
