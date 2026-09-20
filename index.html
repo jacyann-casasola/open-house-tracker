@@ -493,6 +493,9 @@ hr.hair{ border:none; border-top:1px solid var(--line-soft); margin: 18px 0; }
 @media (max-width:480px){
   .signin-intro h1{ white-space:normal; }
   .signin-intro .signin-welcome{ white-space:normal; max-width:340px; margin-left:auto; margin-right:auto; }
+  /* Same narrow-mobile fallback as the sign-in intro heading above: below this width, let
+     the follow-up heading wrap naturally onto two lines rather than clip or overflow. */
+  .neighbor-heading-wrap h1{ white-space:normal; max-width:280px; }
 }
 .signin-form-card{ padding: 28px 24px 30px; }
 .signin-form-card .eyebrow{ margin-top:22px; margin-bottom:12px; }
@@ -532,9 +535,14 @@ hr.hair{ border:none; border-top:1px solid var(--line-soft); margin: 18px 0; }
 }
 .neighbor-context svg{ width:13px; height:13px; flex:none; opacity:.7; }
 .neighbor-heading-wrap{ text-align:center; margin: 0 0 26px; }
+/* max-width widened + nowrap added so the full question fits on one line at standard desktop
+   and iPad widths (the app's own content column caps at 640px, so there's ample room) — see
+   the max-width:480px override above for the narrow-mobile wrap fallback. This h1 is shared,
+   unchanged in font/color/weight, by all three follow-up pages (Neighbor, Looking to Buy,
+   Exploring the Area — see screenFollowUpOffer()), so widening it here benefits all three. */
 .neighbor-heading-wrap h1{
   font-family: var(--serif); font-weight:700; letter-spacing:-0.02em; color: var(--ink);
-  font-size:20px; line-height:1.3; max-width:300px; margin:0 auto 8px;
+  font-size:20px; line-height:1.3; max-width:460px; margin:0 auto 8px; white-space:nowrap;
 }
 .neighbor-heading-wrap p{
   color: var(--ink-soft); font-weight:400; font-size:14.5px; line-height:1.55;
@@ -883,7 +891,28 @@ var CONTENT_DEFAULTS = {
     neighborYesButton: "Yes, please",
     neighborNoButton: "Not right now",
     neighborAddressPlaceholder: "Start typing your address...",
-    neighborAddressSubmitButton: "Submit"
+    neighborAddressSubmitButton: "Submit",
+    /* Similar Properties Follow-Up — shown only for visitors who select "Looking to Buy" or
+       "Exploring the Area" as their Reason for Visit, immediately after their normal sign-in
+       info is submitted and before the usual thank-you/confirm screen. Visually reuses the
+       exact same layout/classes as the Neighbor Home Value Follow-Up above (see
+       screenFollowUpOffer()) so all three follow-up pages read as one consistent experience. */
+    buyFollowUpHeading: "Find More Homes You'll Love",
+    buyFollowUpQuestion: "Would you like us to send you similar properties that match what you're looking for?",
+    buyFollowUpYesButton: "Yes, Send Me Similar Homes",
+    buyFollowUpNoButton: "No, Thanks",
+    buyFollowUpEmailLabel: "Email Address",
+    buyFollowUpEmailPlaceholder: "Enter your email address",
+    buyFollowUpEmailSupportingText: "We'll use your email to send you the property listings and updates you've requested.",
+    buyFollowUpContinueButton: "Continue",
+    exploreFollowUpHeading: "Discover More Homes in the Area",
+    exploreFollowUpQuestion: "Would you like us to send you similar properties and new listings in this neighborhood?",
+    exploreFollowUpYesButton: "Yes, Keep Me Updated",
+    exploreFollowUpNoButton: "No, Thanks",
+    exploreFollowUpEmailLabel: "Email Address",
+    exploreFollowUpEmailPlaceholder: "Enter your email address",
+    exploreFollowUpEmailSupportingText: "We'll use your email to send you the property listings and updates you've requested.",
+    exploreFollowUpContinueButton: "Continue"
   },
   quickCapture: {
     title: "Quick Visitor Capture",
@@ -1580,6 +1609,7 @@ function migrateVisitorDetail(old){
     old.searchDealBreakers = obj(old.searchDealBreakers); old.searchDealBreakers.selected = arr(old.searchDealBreakers.selected); old.searchDealBreakers.note = old.searchDealBreakers.note || "";
     old.homeAddress = old.homeAddress || "";
     old.homeValuationRequested = !!old.homeValuationRequested;
+    old.similarPropertiesRequested = (old.similarPropertiesRequested===true || old.similarPropertiesRequested===false) ? old.similarPropertiesRequested : null;
     old.tasks = arr(old.tasks).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; });
     old.notesComplete = !!old.notesComplete;
     return old;
@@ -1667,6 +1697,7 @@ function migrateVisitorDetail(old){
     searchDealBreakers: { selected: [], note: "" },
     homeAddress: old.homeAddress || "",
     homeValuationRequested: !!old.homeValuationRequested,
+    similarPropertiesRequested: (old.similarPropertiesRequested===true || old.similarPropertiesRequested===false) ? old.similarPropertiesRequested : null,
     tasks: arr(old.tasks).map(function(t){ return { id:t.id||uid(), text:t.text||"", done:!!t.done, dueDate:t.dueDate||"", assignedTo:t.assignedTo||"" }; }),
     notesComplete: !!old.notesComplete
   };
@@ -1903,6 +1934,13 @@ function newVisitor(openHouseId, data, capturedLater){
          Neighbor (visitPurpose/contactType "neighbor"); left blank/false for everyone else. */
       homeAddress: "",
       homeValuationRequested: false,
+      /* Similar Properties Follow-Up — only ever populated for visitors who select "Looking to
+         Buy" or "Exploring the Area" at sign-in and complete that follow-up phase (see
+         mountFollowUpOffer()). null means "not applicable / not yet answered" (e.g. every other
+         visitor category, or someone who left before reaching Submit on that phase) — kept
+         distinct from false ("asked, and they said no") so Admin View only ever shows the
+         Similar Properties status for visitors it's actually relevant to. */
+      similarPropertiesRequested: null,
       /* Every new visitor record — sign-in kiosk or agent quick capture — gets these
          two follow-up tasks automatically, so nothing depends on an agent remembering
          to add them by hand. */
@@ -3040,12 +3078,13 @@ function screenSignIn(){
       '<div style="padding-top:'+(hasPhoto?'0':'36px')+';">'+brandline+'</div>' +
       '<div class="content">' +
         /* A very thin, neutral divider marks the transition from the shared hero into the
-           neighbor-specific content — the one subtle visual cue, nothing heavier. */
-        '<hr class="hair" style="margin:14px 0 18px;">' +
-        /* Compact, understated property recap — no "live" pulse-dot here, since there is no
-           visitor-facing status to communicate on this screen; just the same active property
-           data already shown one step ago. */
-        '<div class="neighbor-context">'+ICONS.home+'<span>'+esc(propertyOneLine(oh))+'</span></div>' +
+           neighbor-specific content — the one subtle visual cue, nothing heavier. Its bottom
+           margin was widened slightly (was 18px) to keep the same overall vertical rhythm now
+           that the property-address recap line that used to sit here has been removed — the
+           follow-up pages focus entirely on the question, never the property address (see
+           Property Photo/Address Handling note in the project's Delete Open House work for the
+           equivalent principle applied there). */
+        '<hr class="hair" style="margin:14px 0 28px;">' +
         '<div class="neighbor-heading-wrap">' +
           '<h1>'+esc(cfg("signin.neighborHeading"))+'</h1>' +
           '<p>'+esc(cfg("signin.neighborSubtext"))+'</p>' +
@@ -3074,6 +3113,17 @@ function screenSignIn(){
       '<button class="kiosk-home-btn" data-action="openViewMenu" aria-label="Return to Admin">'+ICONS.home+'</button>' +
       '</div>';
   }
+
+  /* Similar Properties Follow-Up — same "one extra sign-in phase" pattern as the Neighbor
+     Home Value Follow-Up above (reuses this visitor's existing record via
+     route.params.visitorId, never creates a second one), for visitors who select "Looking to
+     Buy" or "Exploring the Area" as their Reason for Visit. Shares the exact same
+     hero/brandline/.neighbor-heading-wrap/.card/.toggle-row/.chip/.field/.btn-primary markup
+     and CSS as the Neighbor page (via screenFollowUpOffer() below) so all three read as one
+     consistent follow-up experience, differing only in copy and whether the reveal collects an
+     email (Buy/Exploring) or a home address (Neighbor). */
+  if(phase === "buyFollowUp") return screenFollowUpOffer(oh, hasPhoto, heroHtml, brandline, "bf", "buyFollowUp");
+  if(phase === "exploreFollowUp") return screenFollowUpOffer(oh, hasPhoto, heroHtml, brandline, "ef", "exploreFollowUp");
 
   var nameF = fieldCfg("signin","name"), phoneF = fieldCfg("signin","phone"), emailF = fieldCfg("signin","email");
   var identityBlock =
@@ -3112,6 +3162,49 @@ function screenSignIn(){
       assembleSections("signin", blocks) +
 
       '<button class="btn btn-primary" id="s-submit" style="margin-top:22px;">'+esc(cfg("signin.submitButton"))+'</button>' +
+    '</div>' +
+    '<button class="kiosk-home-btn" data-action="openViewMenu" aria-label="Return to Admin">'+ICONS.home+'</button>' +
+    '</div>';
+}
+
+/* Shared renderer for the "Similar Properties" follow-up pages (Looking to Buy / Exploring
+   the Area) — deliberately built to emit the exact same markup/class structure as the Neighbor
+   Home Value Follow-Up above (heroHtml/brandline/.neighbor-heading-wrap/.section-head+.card/
+   .toggle-row/.chip/.field/.btn-primary), so the three follow-up pages are visually one
+   consistent experience rather than three separate designs. The only structural difference
+   from the Neighbor page is WHAT the Yes-reveal collects — an email address here instead of a
+   home address — using the exact same .neighbor-address-reveal show/hide animation and .field
+   styling. idPrefix ("bf"/"ef") namespaces the DOM ids so both phases' mount functions can
+   coexist without colliding; keyPrefix ("buyFollowUp"/"exploreFollowUp") looks up this
+   phase's copy from Content & Copy, exactly like the Neighbor page's own "signin.neighbor*"
+   keys — fully admin-editable, consistent with every other screen in this app. */
+function screenFollowUpOffer(oh, hasPhoto, heroHtml, brandline, idPrefix, keyPrefix){
+  return '<div class="screen signin-screen'+(hasPhoto?' has-hero':'')+'">' +
+    heroHtml +
+    '<div style="padding-top:'+(hasPhoto?'0':'36px')+';">'+brandline+'</div>' +
+    '<div class="content">' +
+      '<hr class="hair" style="margin:14px 0 28px;">' +
+      '<div class="neighbor-heading-wrap">' +
+        '<h1>'+esc(cfg("signin."+keyPrefix+"Heading"))+'</h1>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div style="font-size:15.5px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:14px;">'+esc(cfg("signin."+keyPrefix+"Question"))+'</div>' +
+        '<div class="toggle-row" id="'+idPrefix+'-yn">' +
+          '<button type="button" class="chip" id="'+idPrefix+'-yes">'+esc(cfg("signin."+keyPrefix+"YesButton"))+'</button>' +
+          '<button type="button" class="chip" id="'+idPrefix+'-no">'+esc(cfg("signin."+keyPrefix+"NoButton"))+'</button>' +
+        '</div>' +
+        /* Same reveal-on-Yes pattern as the Neighbor address field: lives inside this same
+           card, Submit is a separate always-present element that alone commits/navigates —
+           selecting Yes or No never submits or saves by itself. */
+        '<div class="neighbor-address-reveal" id="'+idPrefix+'-email-reveal">' +
+          '<div class="field" style="margin-top:20px;margin-bottom:0;">' +
+            '<label>'+esc(cfg("signin."+keyPrefix+"EmailLabel"))+'</label>' +
+            '<input type="email" id="'+idPrefix+'-email" placeholder="'+esc(cfg("signin."+keyPrefix+"EmailPlaceholder"))+'" autocomplete="off">' +
+          '</div>' +
+          '<p style="color:var(--ink-soft);font-size:13px;line-height:1.55;margin-top:8px;margin-bottom:0;">'+esc(cfg("signin."+keyPrefix+"EmailSupportingText"))+'</p>' +
+        '</div>' +
+        '<button type="button" class="btn btn-primary" id="'+idPrefix+'-submit" style="width:100%;margin-top:16px;" disabled>'+esc(cfg("signin."+keyPrefix+"ContinueButton"))+'</button>' +
+      '</div>' +
     '</div>' +
     '<button class="kiosk-home-btn" data-action="openViewMenu" aria-label="Return to Admin">'+ICONS.home+'</button>' +
     '</div>';
@@ -3174,6 +3267,13 @@ function mountSignIn(){
          exact same visitor record (v.id) — no duplicate record is ever created. */
       if(picked.visitPurpose === "neighbor"){
         nav("signin", { phase:"neighborOffer", visitorId: v.id });
+      } else if(picked.visitPurpose === "buy"){
+        /* Similar Properties Follow-Up — same "one extra phase, same record" pattern as
+           Neighbor above; every other Reason for Visit goes straight to the normal
+           thank-you screen, unchanged. */
+        nav("signin", { phase:"buyFollowUp", visitorId: v.id });
+      } else if(picked.visitPurpose === "exploring"){
+        nav("signin", { phase:"exploreFollowUp", visitorId: v.id });
       } else {
         nav("signin", { phase:"confirm" });
         setTimeout(function(){ nav("signin", { phase:"form" }); }, 2800);
@@ -3270,6 +3370,99 @@ function mountNeighborOffer(){
       }
       /* selection === "no": intentionally writes nothing — no address, no valuation flag, no
          follow-up action. Declining is not a negative lead status, just an explicit no-op. */
+      saveState();
+      goToConfirm();
+    });
+  }
+}
+
+/* Similar Properties Follow-Up — shared mount for both the "Looking to Buy" and "Exploring
+   the Area" follow-up phases (idPrefix "bf"/"ef"), mirroring mountNeighborOffer() above exactly:
+   Yes/No only ever toggle selection + the email field's visibility, never save or navigate by
+   themselves; Submit is the one action that commits the response and advances the screen. This
+   reuses the SAME visitor record created at the main sign-in Submit (route.params.visitorId) —
+   no second record is ever created — and writes the email into v.email, the one and only email
+   field on a visitor record, so an address already captured on the main form is preserved and
+   editable here rather than duplicated into a separate field. */
+function mountFollowUpOffer(idPrefix){
+  var nv = findVisitor(route.params.visitorId);
+  if(!nv){
+    /* Safety net only — should not happen in normal use, since we always pass the id of the
+       record just created at the main sign-in Submit. Falls back to the standard completion
+       experience, same as mountNeighborOffer()'s equivalent guard. */
+    nav("signin", { phase:"confirm" });
+    setTimeout(function(){ nav("signin", { phase:"form" }); }, 2800);
+    return;
+  }
+  var d = nv.detail;
+
+  function goToConfirm(){
+    nav("signin", { phase:"confirm" });
+    setTimeout(function(){ nav("signin", { phase:"form" }); }, 2800);
+  }
+
+  var yesBtn = document.getElementById(idPrefix+"-yes");
+  var noBtn = document.getElementById(idPrefix+"-no");
+  var reveal = document.getElementById(idPrefix+"-email-reveal");
+  var emailEl = document.getElementById(idPrefix+"-email");
+  var submitBtn = document.getElementById(idPrefix+"-submit");
+  var selection = null; /* null | "yes" | "no" — same single source of truth pattern as Neighbor */
+
+  /* Prefill from whatever email was already captured on the main sign-in form (if any) so the
+     visitor can review or edit it rather than re-type it — this is v.email itself, not a copy,
+     so there is never a second/conflicting email value on the record. */
+  if(emailEl && nv.email) emailEl.value = nv.email;
+
+  function updateSubmitState(){
+    if(!submitBtn) return;
+    if(selection === "yes"){
+      var val = emailEl ? emailEl.value.trim() : "";
+      submitBtn.disabled = !(val && EMAIL_RE.test(val));
+    }else if(selection === "no"){
+      submitBtn.disabled = false;
+    }else{
+      submitBtn.disabled = true;
+    }
+  }
+
+  if(yesBtn){
+    yesBtn.addEventListener("click", function(){
+      selection = "yes";
+      yesBtn.classList.add("selected");
+      if(noBtn) noBtn.classList.remove("selected");
+      if(reveal){
+        reveal.classList.add("show");
+        setTimeout(function(){ if(emailEl) emailEl.focus(); }, 350);
+      }
+      updateSubmitState();
+    });
+  }
+  if(noBtn){
+    noBtn.addEventListener("click", function(){
+      selection = "no";
+      noBtn.classList.add("selected");
+      if(yesBtn) yesBtn.classList.remove("selected");
+      /* Hides the field but does not clear it — switching back to Yes keeps whatever was
+         already typed, same behavior as the Neighbor address field. */
+      if(reveal) reveal.classList.remove("show");
+      updateSubmitState();
+    });
+  }
+  if(emailEl) emailEl.addEventListener("input", updateSubmitState);
+  if(submitBtn){
+    submitBtn.addEventListener("click", function(){
+      if(submitBtn.disabled) return;
+      if(selection === "yes"){
+        var email = emailEl ? emailEl.value.trim() : "";
+        if(!email || !EMAIL_RE.test(email)){ if(emailEl) emailEl.focus(); toast("Enter a valid email address"); return; }
+        nv.email = email;
+        d.similarPropertiesRequested = true;
+      }else{
+        /* selection === "no": explicitly recorded as false (not left null/unanswered) so
+           Admin View shows "Similar Properties: Not Requested" rather than nothing — and so
+           that switching from Yes to No before Submit never leaves a stale "true" behind. */
+        d.similarPropertiesRequested = false;
+      }
       saveState();
       goToConfirm();
     });
@@ -3963,6 +4156,16 @@ function screenVisitorDetail(){
           '<div class="field"><label>Home Address</label><input type="text" data-field="homeAddress" value="'+esc(d.homeAddress)+'" placeholder="Enter their property address"></div>' +
           '<div class="single-story-row" style="margin-top:2px;margin-bottom:0;"><input type="checkbox" id="home-valuation-requested" '+(d.homeValuationRequested?"checked":"")+'><label for="home-valuation-requested">Home Valuation Requested</label></div>' +
           (d.homeValuationRequested && d.followUp.nextAction ? '<div style="margin-top:14px;font-size:13px;color:var(--ink-soft);">Next Action: <b style="color:var(--ink);">'+esc(d.followUp.nextAction)+'</b></div>' : '') +
+        '</div>' : '') +
+      /* Similar Properties Follow-Up — only ever shown for visitors who selected "Looking to
+         Buy" or "Exploring the Area" AND actually reached and completed that follow-up phase
+         (similarPropertiesRequested is null, not true/false, for everyone else — see
+         newVisitor()/migrateVisitorDetail()), so this never adds clutter for unrelated visitor
+         categories. The email itself is never duplicated here — it's the same v.email shown
+         in this visitor's contact info above; this block only surfaces the Yes/No status. */
+      (((v.visitPurpose==="buy" || v.visitPurpose==="exploring") && d.similarPropertiesRequested !== null) ? subHead("Similar Properties Follow-Up") +
+        '<div class="card section-card-theirsearch">' +
+          '<div class="pill-row" style="margin-bottom:0;justify-content:flex-start;"><span class="pill-static'+(d.similarPropertiesRequested?" pill-gold":"")+'">Similar Properties: '+(d.similarPropertiesRequested?"Requested":"Not Requested")+'</span></div>' +
         '</div>' : '') +
       (chsF.visible!==false ? '<div class="card section-card-theirsearch">' +
         '<div class="th-field" style="margin-bottom:0;"><label>Current Housing</label><div class="toggle-row">'+chipGroupHtml(CURRENT_HOUSING_OPTIONS, "currentHousing", d.currentHousing)+'</div></div>' +
@@ -4796,6 +4999,22 @@ var CONTENT_FIELD_REGISTRY = [
   {group:"Neighbor Follow-Up", path:"signin.neighborNoButton", label:'"Not Right Now" Button Label'},
   {group:"Neighbor Follow-Up", path:"signin.neighborAddressPlaceholder", label:"Home Address Field Placeholder"},
   {group:"Neighbor Follow-Up", path:"signin.neighborAddressSubmitButton", label:"Address Submit Button Label"},
+  {group:"Looking to Buy Follow-Up", path:"signin.buyFollowUpHeading", label:"Screen Heading"},
+  {group:"Looking to Buy Follow-Up", path:"signin.buyFollowUpQuestion", label:"Screen Question"},
+  {group:"Looking to Buy Follow-Up", path:"signin.buyFollowUpYesButton", label:'"Yes" Button Label'},
+  {group:"Looking to Buy Follow-Up", path:"signin.buyFollowUpNoButton", label:'"No" Button Label'},
+  {group:"Looking to Buy Follow-Up", path:"signin.buyFollowUpEmailLabel", label:"Email Field Label"},
+  {group:"Looking to Buy Follow-Up", path:"signin.buyFollowUpEmailPlaceholder", label:"Email Field Placeholder"},
+  {group:"Looking to Buy Follow-Up", path:"signin.buyFollowUpEmailSupportingText", label:"Email Field Supporting Text", multiline:true},
+  {group:"Looking to Buy Follow-Up", path:"signin.buyFollowUpContinueButton", label:"Continue Button Label"},
+  {group:"Exploring the Area Follow-Up", path:"signin.exploreFollowUpHeading", label:"Screen Heading"},
+  {group:"Exploring the Area Follow-Up", path:"signin.exploreFollowUpQuestion", label:"Screen Question"},
+  {group:"Exploring the Area Follow-Up", path:"signin.exploreFollowUpYesButton", label:'"Yes" Button Label'},
+  {group:"Exploring the Area Follow-Up", path:"signin.exploreFollowUpNoButton", label:'"No" Button Label'},
+  {group:"Exploring the Area Follow-Up", path:"signin.exploreFollowUpEmailLabel", label:"Email Field Label"},
+  {group:"Exploring the Area Follow-Up", path:"signin.exploreFollowUpEmailPlaceholder", label:"Email Field Placeholder"},
+  {group:"Exploring the Area Follow-Up", path:"signin.exploreFollowUpEmailSupportingText", label:"Email Field Supporting Text", multiline:true},
+  {group:"Exploring the Area Follow-Up", path:"signin.exploreFollowUpContinueButton", label:"Continue Button Label"},
   {group:"Quick Add Visitor", path:"quickCapture.title", label:"Sheet Title"},
   {group:"Quick Add Visitor", path:"quickCapture.namePlaceholder", label:"Name Field Placeholder"},
   {group:"Quick Add Visitor", path:"quickCapture.emailPlaceholder", label:"Email Field Placeholder"},
@@ -5594,6 +5813,8 @@ function mountRoute(){
   if(route.name==="sellerReport"){ mountSellerReport(); }
   if(route.name==="signin" && (route.params.phase||"form")==="form"){ mountSignIn(); }
   if(route.name==="signin" && route.params.phase==="neighborOffer"){ mountNeighborOffer(); }
+  if(route.name==="signin" && route.params.phase==="buyFollowUp"){ mountFollowUpOffer("bf"); }
+  if(route.name==="signin" && route.params.phase==="exploreFollowUp"){ mountFollowUpOffer("ef"); }
   if(route.name==="settings"){ mountSettings(); }
 }
 
