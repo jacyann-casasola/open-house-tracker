@@ -123,6 +123,14 @@ input,textarea,select{ font-family: inherit; }
 .btn-danger:active{ box-shadow: var(--shadow-1); }
 .btn-sm{ padding:10px 18px; font-size:14px; width:auto; }
 .btn[disabled]{ opacity:.35; pointer-events:none; }
+/* Looks exactly like [disabled] (dimmed) but — unlike the native disabled attribute — still
+   receives clicks. Used on the three sign-in follow-up Submit buttons (Neighbor/Buy/Exploring)
+   so tapping it while a required answer is missing can show the visitor a specific "here's
+   what's missing" message instead of doing nothing at all. See mountNeighborOffer() and
+   mountFollowUpOffer() for why: a genuinely disabled button never fires its click handler in
+   any real browser, so the visitor gets zero feedback and can easily believe they've finished
+   when they haven't. */
+.btn.soft-disabled{ opacity:.35; }
 .btn-row{ display:flex; gap:12px; }
 .btn-row .btn{ flex:1; }
 
@@ -3107,7 +3115,7 @@ function screenSignIn(){
               '<input type="text" id="n-address" placeholder="'+esc(cfg("signin.neighborAddressPlaceholder"))+'" autocomplete="off">' +
             '</div>' +
           '</div>' +
-          '<button type="button" class="btn btn-primary" id="n-submit" style="width:100%;margin-top:16px;" disabled>'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
+          '<button type="button" class="btn btn-primary soft-disabled" id="n-submit" style="width:100%;margin-top:16px;">'+esc(cfg("signin.neighborAddressSubmitButton"))+'</button>' +
         '</div>' +
       '</div>' +
       '<button class="kiosk-home-btn" data-action="openViewMenu" aria-label="Return to Admin">'+ICONS.home+'</button>' +
@@ -3203,7 +3211,7 @@ function screenFollowUpOffer(oh, hasPhoto, heroHtml, brandline, idPrefix, keyPre
           '</div>' +
           '<p style="color:var(--ink-soft);font-size:13px;line-height:1.55;margin-top:8px;margin-bottom:0;">'+esc(cfg("signin."+keyPrefix+"EmailSupportingText"))+'</p>' +
         '</div>' +
-        '<button type="button" class="btn btn-primary" id="'+idPrefix+'-submit" style="width:100%;margin-top:16px;" disabled>'+esc(cfg("signin."+keyPrefix+"ContinueButton"))+'</button>' +
+        '<button type="button" class="btn btn-primary soft-disabled" id="'+idPrefix+'-submit" style="width:100%;margin-top:16px;">'+esc(cfg("signin."+keyPrefix+"ContinueButton"))+'</button>' +
       '</div>' +
     '</div>' +
     '<button class="kiosk-home-btn" data-action="openViewMenu" aria-label="Return to Admin">'+ICONS.home+'</button>' +
@@ -3338,14 +3346,20 @@ function mountNeighborOffer(){
      single source of truth for what a later Submit press should do. */
   var selection = null; /* null | "yes" | "no" */
 
+  /* Dims the Submit button when the current selection isn't complete yet (no Yes/No chosen,
+     or Yes chosen but the address is still blank) — but, unlike a real [disabled] attribute,
+     never blocks the click itself. See the .soft-disabled CSS rule: a genuinely disabled
+     button silently swallows every tap in every real browser, so a visitor who taps it while
+     it's incomplete would get no feedback at all and could easily believe they were done. The
+     click handler below still validates and shows a specific toast for whatever's missing. */
   function updateSubmitState(){
     if(!submitBtn) return;
     if(selection === "yes"){
-      submitBtn.disabled = !(addressEl && addressEl.value.trim());
+      submitBtn.classList.toggle("soft-disabled", !(addressEl && addressEl.value.trim()));
     }else if(selection === "no"){
-      submitBtn.disabled = false;
+      submitBtn.classList.remove("soft-disabled");
     }else{
-      submitBtn.disabled = true;
+      submitBtn.classList.add("soft-disabled");
     }
   }
 
@@ -3388,7 +3402,11 @@ function mountNeighborOffer(){
        retried) and the visitor sees a plain error instead of a false "you're all set". */
     var submitting = false;
     submitBtn.addEventListener("click", function(){
-      if(submitBtn.disabled || submitting) return;
+      if(submitting) return;
+      /* No native [disabled] attribute gates this click anymore (see updateSubmitState above),
+         so an incomplete answer is handled explicitly here instead of the tap silently doing
+         nothing — the visitor is told exactly what's missing. */
+      if(selection === null){ toast("Choose Yes or No to continue"); return; }
       var prevAddress = d.homeAddress, prevValuation = d.homeValuationRequested, prevNextAction = d.followUp.nextAction;
       if(selection === "yes"){
         var address = addressEl ? addressEl.value.trim() : "";
@@ -3458,15 +3476,18 @@ function mountFollowUpOffer(idPrefix){
      so there is never a second/conflicting email value on the record. */
   if(emailEl && nv.email) emailEl.value = nv.email;
 
+  /* Same soft-disabled pattern as mountNeighborOffer() above: dims the button when the
+     selection is incomplete, but never uses the native [disabled] attribute, which would
+     silently swallow the tap in every real browser and leave the visitor with zero feedback. */
   function updateSubmitState(){
     if(!submitBtn) return;
     if(selection === "yes"){
       var val = emailEl ? emailEl.value.trim() : "";
-      submitBtn.disabled = !(val && EMAIL_RE.test(val));
+      submitBtn.classList.toggle("soft-disabled", !(val && EMAIL_RE.test(val)));
     }else if(selection === "no"){
-      submitBtn.disabled = false;
+      submitBtn.classList.remove("soft-disabled");
     }else{
-      submitBtn.disabled = true;
+      submitBtn.classList.add("soft-disabled");
     }
   }
 
@@ -3501,7 +3522,11 @@ function mountFollowUpOffer(idPrefix){
        sign-in step) on failure so a retry can never duplicate or half-apply the response. */
     var submitting = false;
     submitBtn.addEventListener("click", function(){
-      if(submitBtn.disabled || submitting) return;
+      if(submitting) return;
+      /* No native [disabled] attribute gates this click anymore (see updateSubmitState above) —
+         an incomplete answer is validated explicitly here so the visitor is told what's
+         missing instead of the tap silently doing nothing. */
+      if(selection === null){ toast("Choose Yes or No to continue"); return; }
       var prevEmail = nv.email, prevSimilar = d.similarPropertiesRequested;
       if(selection === "yes"){
         var email = emailEl ? emailEl.value.trim() : "";
