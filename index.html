@@ -1165,7 +1165,7 @@ function defaultSyncConfig(){
   return { enabled:false, apiKey:"", authDomain:"", databaseURL:"", projectId:"", appId:"", roomId:"" };
 }
 function defaultState(){
-  return { openHouses: [], visitors: [], activeOpenHouseId: null, settings: { adminPasscode: "" }, content: deepMergeDefaults({}, CONTENT_DEFAULTS), sync: defaultSyncConfig() };
+  return { openHouses: [], visitors: [], activeOpenHouseId: null, settings: { adminPasscode: "" }, content: deepMergeDefaults({}, CONTENT_DEFAULTS), sync: defaultSyncConfig(), deletedOpenHouseIds: [] };
 }
 
 function loadState(){
@@ -1757,6 +1757,13 @@ function migrateVisitorRecord(v){
 function migrateState(){
   if(!state.settings) state.settings = { adminPasscode: "" };
   if(!state.sync) state.sync = defaultSyncConfig();
+  /* Persistent tombstone list for permanently-deleted (never just archived) Open House
+     Events — see deleteOpenHouseCascade() and Sync.applyRemote(). Needed so a stale device
+     that reconnects after being offline can never resurrect an event another device already
+     deleted; without this, the sync layer's plain "newest full snapshot wins" rule (see
+     syncPayload/applyRemote) would let an old local copy win a race and bring a deleted event
+     back to life. */
+  if(!Array.isArray(state.deletedOpenHouseIds)) state.deletedOpenHouseIds = [];
   state.content = deepMergeDefaults(state.content, CONTENT_DEFAULTS);
   migrateContentShape();
   state.visitors.forEach(migrateVisitorRecord);
@@ -4626,6 +4633,7 @@ function syncPayload(){
     visitors: state.visitors,
     activeOpenHouseId: state.activeOpenHouseId,
     content: state.content,
+    deletedOpenHouseIds: state.deletedOpenHouseIds || [],
     updatedAt: Date.now()
   };
 }
@@ -4698,15 +4706,24 @@ var Sync = {
   applyRemote: function(remote){
     var localUpdatedAt = state._lastSyncedAt || 0;
     if(!remote.updatedAt || remote.updatedAt <= localUpdatedAt) return;
-    state.openHouses = remote.openHouses || [];
+    /* Tombstone merge for permanently-deleted Open House Events (see deleteOpenHouseCascade()).
+       Deletion tombstones only ever grow (union of whatever either side has ever seen) and are
+       applied on top of whatever this remote snapshot contains — so even if the incoming
+       payload came from a device that went offline before a deletion happened elsewhere and
+       still lists the deleted event, that event is filtered right back out here rather than
+       resurrected. The corrected, filtered result is saved and re-pushed below (existing
+       this.push() call), which is what eventually corrects that stale device too. */
+    var mergedDeletedIds = (state.deletedOpenHouseIds || []).concat(remote.deletedOpenHouseIds || []).filter(function(id, i, arr){ return arr.indexOf(id) === i; });
+    state.openHouses = (remote.openHouses || []).filter(function(o){ return mergedDeletedIds.indexOf(o.id) === -1; });
     /* Firebase Realtime Database silently drops empty arrays/objects on write — a visitor
        with no tasks, no selected motivations, etc. comes back missing those keys entirely
        rather than as []. Route every incoming visitor record back through the exact same
        normalizer migrateState() uses for locally-loaded data (migrateVisitorRecord — covers
        migrateVisitorDetail plus partySize/contactType/etc. backfills), so the rest of the
        app can keep assuming every field always exists regardless of where the record came from. */
-    state.visitors = (remote.visitors || []).map(migrateVisitorRecord);
-    state.activeOpenHouseId = remote.activeOpenHouseId || null;
+    state.visitors = (remote.visitors || []).filter(function(v){ return mergedDeletedIds.indexOf(v.openHouseId) === -1; }).map(migrateVisitorRecord);
+    state.deletedOpenHouseIds = mergedDeletedIds;
+    state.activeOpenHouseId = (mergedDeletedIds.indexOf(remote.activeOpenHouseId) === -1) ? (remote.activeOpenHouseId || null) : null;
     state.content = deepMergeDefaults(remote.content || {}, CONTENT_DEFAULTS);
     /* Critical: a remote snapshot can be older-code than this device (e.g. pushed by a
        kiosk that hasn't reloaded yet). Run it through the same shape migrations as local
@@ -5703,6 +5720,13 @@ function openArchivedSummary(oh){
         '<button class="btn btn-secondary btn-sm" id="btn-arch-seller">Seller Report</button>' +
       '</div>' +
       '<button class="btn btn-secondary" id="btn-reactivate">Reopen as Active</button>' +
+      /* Delete Open House — admin-only (this sheet is only reachable from the Archived list
+         off the admin Welcome hub; a visitor at the Sign-In kiosk never reaches it), visually
+         secondary/danger and separated by a divider from Reopen/Analytics/Seller Report above
+         so it's never mistaken for one of the normal, non-destructive actions on this sheet. */
+      '<div style="display:flex;justify-content:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft);">' +
+        '<button type="button" class="btn btn-danger-ghost btn-sm" id="btn-delete-archived">Delete Open House</button>' +
+      '</div>' +
     '</div>';
   openSheet(body, function(sheet, close){
     sheet.querySelector("[data-sheet-close]").addEventListener("click", close);
@@ -5716,6 +5740,77 @@ function openArchivedSummary(oh){
       saveState();
       close();
       nav("activeOpenHouse");
+    });
+    sheet.querySelector("#btn-delete-archived").addEventListener("click", function(){
+      close();
+      sheetConfirmDeleteOpenHouse(oh);
+    });
+  });
+}
+
+/* ---- Permanently Delete Open House (archived events only) ----
+   Removes the archived event and every visitor record scoped to it — contact info, This Home
+   feedback, Their Home Search criteria, conversation notes, follow-up, tasks, and any Home
+   Valuation Request all live on the visitor record itself (see newVisitor()), so removing the
+   matching state.visitors rows is a complete cleanup, not a multi-table operation. A visitor's
+   sign-in record belongs to exactly one Open House — there is no separate, shared "Contact"
+   record spanning multiple events in this app's data model (see the identical note on Delete
+   Visitor above) — so this can never remove or affect a visitor's unrelated visit, contact
+   info, or follow-up history from a different Open House, even if they attended both.
+   Every analytics figure (per-event Analytics, the Seller Report, the archived-count badge on
+   Welcome) is computed live by filtering state.openHouses/state.visitors on every render rather
+   than cached anywhere, so a deleted event's contributions disappear immediately with no
+   separate recalculation step, and no unrelated event's numbers are touched.
+   Property photo: the only place a photo's bytes live today is oh.photoDataUrl, embedded
+   directly on the Open House record being deleted — removing that record from state.openHouses
+   removes its photo from memory and from the next localStorage write in the same step, which
+   can help reclaim browser storage space. There is currently no Firebase Storage (or other
+   external/cloud file) integration in this app, so there is no separate cloud file to check
+   before deleting — if that's added in the future (see the pending Photo Storage Upgrade plan),
+   this function would need an explicit "is this file referenced by any other event, and am I
+   authorized to delete it" check before ever removing a cloud copy; it must not be assumed safe.
+   Cross-device sync: pushed through the existing Sync.push()/applyRemote() flow via saveState(),
+   with the deleted id recorded in the persistent state.deletedOpenHouseIds tombstone list so a
+   stale device cannot bring the event back — see the comments on that array and on
+   Sync.applyRemote() for how the tombstone is merged and re-propagated. */
+function deleteOpenHouseCascade(oh){
+  if(!oh || oh.status !== "archived") return false;
+  state.deletedOpenHouseIds = state.deletedOpenHouseIds || [];
+  if(state.deletedOpenHouseIds.indexOf(oh.id) === -1) state.deletedOpenHouseIds.push(oh.id);
+  state.openHouses = state.openHouses.filter(function(o){ return o.id !== oh.id; });
+  state.visitors = state.visitors.filter(function(v){ return v.openHouseId !== oh.id; });
+  if(state.activeOpenHouseId === oh.id) state.activeOpenHouseId = null;
+  saveState();
+  return true;
+}
+
+function sheetConfirmDeleteOpenHouse(oh){
+  var vCount = visitorsFor(oh.id).length;
+  var body =
+    '<div class="sheet-head"><h3>Delete this Open House?</h3><button class="sheet-close" data-sheet-close>'+ICONS.close+'</button></div>' +
+    '<div class="sheet-body">' +
+      '<div class="card" style="margin-bottom:14px;">' +
+        '<div style="font-family:var(--serif);font-size:17px;font-weight:700;">'+esc(propertyTitle(oh))+'</div>' +
+        '<div style="color:var(--ink-soft);font-size:13.5px;margin-top:4px;">'+esc(formatDateLong(oh.date))+'</div>' +
+      '</div>' +
+      '<p style="font-size:14px;color:var(--ink-soft);line-height:1.6;">Are you sure you want to permanently delete this archived Open House?</p>' +
+      '<p style="font-size:14px;color:var(--ink-soft);line-height:1.6;">This will permanently delete this Open House Event and its associated visitor records, property feedback, and event-specific analytics. This action cannot be undone.</p>' +
+      (vCount ? '<p style="font-size:13px;color:var(--ink-faint);line-height:1.5;">'+vCount+' visitor record'+(vCount===1?'':'s')+' will be removed.</p>' : '') +
+      '<p style="font-size:13px;color:var(--ink-faint);line-height:1.5;">Want to keep a copy first? You can <button type="button" id="btn-goto-backup" style="background:none;border:none;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;">export a backup from Admin Settings</button> before deleting.</p>' +
+    '</div>' +
+    '<div class="sheet-footer"><div class="btn-row">' +
+      '<button class="btn btn-secondary" data-sheet-cancel>Cancel</button>' +
+      '<button class="btn btn-danger" id="confirm-delete-open-house">Delete Open House</button>' +
+    '</div></div>';
+  openSheet(body, function(sheet, close){
+    sheet.querySelector("[data-sheet-close]").addEventListener("click", close);
+    sheet.querySelector("[data-sheet-cancel]").addEventListener("click", close);
+    sheet.querySelector("#btn-goto-backup").addEventListener("click", function(){ close(); nav("settings", {section:"backup"}); });
+    sheet.querySelector("#confirm-delete-open-house").addEventListener("click", function(){
+      var ok = deleteOpenHouseCascade(oh);
+      close();
+      if(ok){ toast("Open house deleted"); nav("archived"); }
+      else{ toast("Only archived open houses can be deleted"); }
     });
   });
 }
